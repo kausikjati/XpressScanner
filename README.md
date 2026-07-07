@@ -31,3 +31,7 @@ Each value is sent as UTF-8 text followed by a newline, which makes it easy for 
 ## Note for source-only PRs
 
 This repository intentionally does not commit `gradle/wrapper/gradle-wrapper.jar` because some review systems reject binary files in pull requests. If your Android Studio installation requires the wrapper JAR, run `gradle wrapper --gradle-version 8.9 --distribution-type bin` once locally, or let Android Studio use its bundled Gradle to sync the project.
+
+## Troubleshooting launch crashes
+
+`MainActivity` uses `AppCompatActivity`, so the app theme must inherit from an AppCompat theme. If the app closes immediately after launch, confirm `AppTheme` still uses `Theme.AppCompat.Light.NoActionBar` in `app/src/main/res/values/styles.xml`.
