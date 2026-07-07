@@ -37,6 +37,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.activity.ComponentActivity;
+import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
@@ -79,6 +80,8 @@ public class MainActivity extends ComponentActivity {
     };
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
+    private Camera camera;
+    private boolean isFlashOn = false;
     private BarcodeScanner scanner;
     private PreviewView previewView;
     private BarcodeOverlayView barcodeOverlayView;
@@ -102,23 +105,43 @@ public class MainActivity extends ComponentActivity {
     private String lastSent = "";
     private long lastSentAt = 0L;
 
-    // Screen Wake Management
+    // Screen Wake
     private final Handler screenHandler = new Handler(Looper.getMainLooper());
     private final Runnable screenOffRunnable = () -> getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         scanner = BarcodeScanning.getClient();
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
 
         buildLayout();
         requestNeededPermissions();
-        resetScreenTimeout(); // Start the 15-second awake timer on app launch
+        resetScreenTimeout();
     }
 
-    // Detects physical touch anywhere on the screen to keep it awake
+    // Locked Dark Theme Color Engine
+    private int color(String key) {
+        switch(key) {
+            case "bg": return Color.parseColor("#0F172A"); // Slate 900
+            case "card": return Color.parseColor("#1E293B"); // Slate 800
+            case "pillDefault": return Color.parseColor("#334155"); // Slate 700
+            case "textMain": return Color.parseColor("#F8FAFC"); // Slate 50
+            case "textSub": return Color.parseColor("#94A3B8"); // Slate 400
+            case "btnNormal": return Color.parseColor("#334155");
+            case "btnRefresh": return Color.parseColor("#475569");
+            case "inputBg": return Color.parseColor("#0F172A");
+            case "inputStroke": return Color.parseColor("#334155");
+            case "statusGreen": return Color.parseColor("#065F46");
+            case "statusBlue": return Color.parseColor("#1E40AF");
+            case "statusRed": return Color.parseColor("#991B1B");
+            case "statusYellow": return Color.parseColor("#92400E");
+            default: return Color.WHITE;
+        }
+    }
+
     @Override
     public void onUserInteraction() {
         super.onUserInteraction();
@@ -129,54 +152,71 @@ public class MainActivity extends ComponentActivity {
         runOnUiThread(() -> {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             screenHandler.removeCallbacks(screenOffRunnable);
-            screenHandler.postDelayed(screenOffRunnable, 15000); // Wait 15 seconds before allowing sleep
+            screenHandler.postDelayed(screenOffRunnable, 15000);
         });
     }
 
     private void buildLayout() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F1F5F9")); // Slate 100 background
+        root.setBackgroundColor(color("bg"));
         root.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
-        // Enforce Safe Area (Window Insets for Notches, Status Bar, and Nav Bar)
+        // Enforce Safe Area
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(dp(16) + insets.left, dp(20) + insets.top, dp(16) + insets.right, dp(20) + insets.bottom);
             return WindowInsetsCompat.CONSUMED;
         });
 
-        // Top Status Banner (Pill Shape)
+        // Top Header Row
+        LinearLayout headerRow = new LinearLayout(this);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        headerParams.setMargins(0, 0, 0, dp(16));
+        headerRow.setLayoutParams(headerParams);
+
         statusCard = new LinearLayout(this);
         statusCard.setOrientation(LinearLayout.HORIZONTAL);
         statusCard.setGravity(Gravity.CENTER);
-        statusCard.setBackground(createCardDrawable("#E2E8F0", 24));
+        statusCard.setBackground(createCardDrawable(color("pillDefault"), 24));
         statusCard.setPadding(dp(16), dp(10), dp(16), dp(10));
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        cardParams.setMargins(0, 0, 0, dp(16));
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         statusCard.setLayoutParams(cardParams);
 
         statusText = new TextView(this);
         statusText.setText("🔄 Initializing system...");
         statusText.setTextSize(14);
-        statusText.setTextColor(Color.parseColor("#334155"));
+        statusText.setTextColor(color("textMain"));
         statusText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         statusText.setGravity(Gravity.CENTER);
         statusCard.addView(statusText);
-        root.addView(statusCard);
+        headerRow.addView(statusCard);
 
-        // Bluetooth Controller Panel
+        // Info Button
+        ImageButton infoButton = new ImageButton(this);
+        infoButton.setImageResource(android.R.drawable.ic_dialog_info);
+        infoButton.setBackground(null);
+        infoButton.setColorFilter(color("textMain"));
+        infoButton.setPadding(dp(12), dp(10), dp(4), dp(10));
+        infoButton.setOnClickListener(v -> showInstructionsDialog());
+        headerRow.addView(infoButton);
+
+        root.addView(headerRow);
+
+        // Bluetooth Panel
         LinearLayout btPanel = new LinearLayout(this);
         btPanel.setOrientation(LinearLayout.VERTICAL);
-        btPanel.setBackground(createCardDrawable("#FFFFFF", 12));
+        btPanel.setBackground(createCardDrawable(color("card"), 12));
         btPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
 
         deviceButton = new Button(this);
         deviceButton.setText("Select Bluetooth Device");
         deviceButton.setAllCaps(false);
         deviceButton.setTextSize(15);
-        deviceButton.setTextColor(Color.parseColor("#1E293B"));
-        deviceButton.setBackground(createButtonDrawable("#F1F5F9", "#CBD5E1", 8));
+        deviceButton.setTextColor(color("textMain"));
+        deviceButton.setBackground(createCardDrawable(color("btnNormal"), 8));
         deviceButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
@@ -191,8 +231,8 @@ public class MainActivity extends ComponentActivity {
         Button refreshButton = new Button(this);
         refreshButton.setText("Refresh");
         refreshButton.setAllCaps(false);
-        refreshButton.setTextColor(Color.parseColor("#1E293B"));
-        refreshButton.setBackground(createButtonDrawable("#D1D5DB", "#9CA3AF", 8));
+        refreshButton.setTextColor(color("textMain"));
+        refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 8));
         refreshButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
@@ -202,7 +242,7 @@ public class MainActivity extends ComponentActivity {
         connectButton.setAllCaps(false);
         connectButton.setTextColor(Color.WHITE);
         connectButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        connectButton.setBackground(createButtonDrawable("#10B981", "#059669", 8));
+        connectButton.setBackground(createCardDrawable(Color.parseColor("#10B981"), 8));
         connectButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) toggleConnection();
         });
@@ -219,11 +259,11 @@ public class MainActivity extends ComponentActivity {
 
         // Viewport / Camera Frame
         FrameLayout cameraContainer = new FrameLayout(this);
-        LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(240));
+        LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(320));
         cameraContainerParams.setMargins(0, dp(16), 0, dp(16));
         cameraContainer.setLayoutParams(cameraContainerParams);
 
-        cameraContainer.setBackground(createCardDrawable("#000000", 12));
+        cameraContainer.setBackground(createCardDrawable(Color.parseColor("#000000"), 12));
         cameraContainer.setClipToOutline(true);
 
         previewView = new PreviewView(this);
@@ -232,11 +272,32 @@ public class MainActivity extends ComponentActivity {
 
         barcodeOverlayView = new BarcodeOverlayView(this);
         cameraContainer.addView(barcodeOverlayView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        // Floating Camera Flash Toggle
+        Button flashButton = new Button(this);
+        flashButton.setText("⚡");
+        flashButton.setTextSize(18);
+        flashButton.setBackground(createCardDrawable(Color.parseColor("#88000000"), 24));
+        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(dp(44), dp(44));
+        flashParams.gravity = Gravity.BOTTOM | Gravity.END;
+        flashParams.setMargins(0, 0, dp(12), dp(12));
+        flashButton.setLayoutParams(flashParams);
+        flashButton.setOnClickListener(v -> {
+            if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
+                isFlashOn = !isFlashOn;
+                camera.getCameraControl().enableTorch(isFlashOn);
+                flashButton.setBackground(createCardDrawable(Color.parseColor(isFlashOn ? "#AA10B981" : "#88000000"), 24));
+            } else {
+                toast("Flash not supported on this lens.");
+            }
+        });
+        cameraContainer.addView(flashButton);
+
         root.addView(cameraContainer);
 
         // Realtime Scan Logs Card
         LinearLayout logsCard = new LinearLayout(this);
-        logsCard.setBackground(createCardDrawable("#0F172A", 12));
+        logsCard.setBackground(createCardDrawable(Color.parseColor("#0F172A"), 12));
         logsCard.setPadding(dp(16), dp(14), dp(16), dp(14));
         lastScanText = new TextView(this);
         lastScanText.setText("Last scan: Ready for data...");
@@ -253,7 +314,7 @@ public class MainActivity extends ComponentActivity {
         // Manual Intervention Console
         LinearLayout manualPanel = new LinearLayout(this);
         manualPanel.setOrientation(LinearLayout.VERTICAL);
-        manualPanel.setBackground(createCardDrawable("#FFFFFF", 12));
+        manualPanel.setBackground(createCardDrawable(color("card"), 12));
         manualPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
         LinearLayout.LayoutParams manualParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         manualParams.setMargins(0, dp(16), 0, 0);
@@ -265,14 +326,14 @@ public class MainActivity extends ComponentActivity {
         manualInput = new EditText(this);
         manualInput.setSingleLine(true);
         manualInput.setHint("Input value manually...");
-        manualInput.setHintTextColor(Color.parseColor("#94A3B8"));
-        manualInput.setTextColor(Color.parseColor("#1E293B"));
+        manualInput.setHintTextColor(color("textSub"));
+        manualInput.setTextColor(color("textMain"));
         manualInput.setTextSize(15);
         manualInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
 
         GradientDrawable etBg = new GradientDrawable();
-        etBg.setColor(Color.parseColor("#F8FAFC"));
-        etBg.setStroke(dp(1), Color.parseColor("#E2E8F0"));
+        etBg.setColor(color("inputBg"));
+        etBg.setStroke(dp(1), color("inputStroke"));
         etBg.setCornerRadius(dp(6));
         manualInput.setBackground(etBg);
         manualInput.setPadding(dp(12), dp(10), dp(12), dp(10));
@@ -288,13 +349,12 @@ public class MainActivity extends ComponentActivity {
         ImageButton sendButton = new ImageButton(this);
         sendButton.setImageResource(android.R.drawable.ic_menu_send);
         sendButton.setColorFilter(Color.WHITE);
-        sendButton.setBackground(createButtonDrawable("#6366F1", "#4F46E5", 6));
+        sendButton.setBackground(createCardDrawable(Color.parseColor("#4F46E5"), 6));
         sendButton.setOnClickListener(v -> sendManualValue());
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         inputParams.setMargins(0, 0, dp(10), 0);
         manualRow.addView(manualInput, inputParams);
-
         manualRow.addView(sendButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
         manualPanel.addView(manualRow);
         root.addView(manualPanel);
@@ -302,24 +362,34 @@ public class MainActivity extends ComponentActivity {
         setContentView(root);
     }
 
-    private GradientDrawable createCardDrawable(String hexColor, int radiusDp) {
+    private void showInstructionsDialog() {
+        String instructions = "1. Pair your Devices\n" +
+                "Open your phone's standard Android Settings > Bluetooth, and pair your phone with your Mac/PC.\n\n" +
+                "2. Start the Framework\n" +
+                "Open this app. Wait for the top banner to say \"✅ Scanner ready\". Your phone is now actively mimicking a wireless keyboard.\n\n" +
+                "3. Connect to Computer\n" +
+                "Tap \"Select Bluetooth Device\" and choose your computer. Then tap \"Connect (HID)\".\n\n" +
+                "4. Scan Barcodes\n" +
+                "Click into any text field on your computer. Point your camera at a barcode. The app will automatically type the code on your computer and hit Enter!";
+
+        new AlertDialog.Builder(this)
+                .setTitle("How to Use Xpress Scanner")
+                .setMessage(instructions)
+                .setPositiveButton("Got it", null)
+                .show();
+    }
+
+    private GradientDrawable createCardDrawable(int colorInt, int radiusDp) {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(Color.parseColor(hexColor));
+        drawable.setColor(colorInt);
         drawable.setCornerRadius(dp(radiusDp));
         return drawable;
     }
 
-    private GradientDrawable createButtonDrawable(String normalHex, String pressedHex, int radiusDp) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(Color.parseColor(normalHex));
-        drawable.setCornerRadius(dp(radiusDp));
-        return drawable;
-    }
-
-    private void updateStatusUI(String message, String bgColor) {
+    private void updateStatusUI(String message, String colorKey) {
         runOnUiThread(() -> {
             statusText.setText(message);
-            statusCard.setBackground(createCardDrawable(bgColor, 24));
+            statusCard.setBackground(createCardDrawable(color(colorKey), 24));
         });
     }
 
@@ -343,7 +413,7 @@ public class MainActivity extends ComponentActivity {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                 startCamera();
             } else {
-                updateStatusUI("❌ Camera denied. Scanning disabled.", "#FEE2E2");
+                updateStatusUI("❌ Camera denied. Scanning disabled.", "statusRed");
             }
             if (hasBluetoothPermission()) {
                 setupHidProfile();
@@ -394,7 +464,7 @@ public class MainActivity extends ComponentActivity {
             @Override
             public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
                 if (registered) {
-                    updateStatusUI("✅ Scanner ready. Select target.", "#DCFCE7");
+                    updateStatusUI("✅ Scanner ready. Select target.", "statusGreen");
                 }
             }
 
@@ -403,18 +473,20 @@ public class MainActivity extends ComponentActivity {
                 if (state == BluetoothProfile.STATE_CONNECTED) {
                     hidConnectedDevice = device;
                     String name = device.getName() == null ? "Unknown Host" : device.getName();
-                    updateStatusUI("🔗 Connected to: " + name, "#DBEAFE");
+                    updateStatusUI("🔗 Connected to: " + name, "statusBlue");
+
+                    triggerConnectBeep();
 
                     runOnUiThread(() -> {
-                        connectButton.setBackground(createButtonDrawable("#EF4444", "#DC2626", 8));
+                        connectButton.setBackground(createCardDrawable(Color.parseColor("#DC2626"), 8));
                         connectButton.setText("Disconnect");
                     });
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
                     hidConnectedDevice = null;
-                    updateStatusUI("❌ Link broken. Disconnected.", "#FEE2E2");
+                    updateStatusUI("❌ Link broken. Disconnected.", "statusRed");
 
                     runOnUiThread(() -> {
-                        connectButton.setBackground(createButtonDrawable("#10B981", "#059669", 8));
+                        connectButton.setBackground(createCardDrawable(Color.parseColor("#10B981"), 8));
                         connectButton.setText("Connect (HID)");
                     });
                 }
@@ -448,7 +520,6 @@ public class MainActivity extends ComponentActivity {
                 }).show();
     }
 
-    // Handles smart switching between Connecting and Disconnecting
     @SuppressLint("MissingPermission")
     private void toggleConnection() {
         if (hidDeviceProxy == null) {
@@ -457,16 +528,14 @@ public class MainActivity extends ComponentActivity {
         }
 
         if (hidConnectedDevice != null) {
-            // Actively Disconnect from the current device
-            updateStatusUI("⏳ Disconnecting...", "#FEF3C7");
+            updateStatusUI("⏳ Disconnecting...", "statusYellow");
             hidDeviceProxy.disconnect(hidConnectedDevice);
         } else {
-            // Attempt to Connect to the selected device
             if (selectedDevice == null) {
                 toast("Choose a paired configuration first.");
                 return;
             }
-            updateStatusUI("⏳ Connecting HID Framework...", "#FEF3C7");
+            updateStatusUI("⏳ Connecting HID Framework...", "statusYellow");
             hidDeviceProxy.connect(selectedDevice);
         }
     }
@@ -483,9 +552,10 @@ public class MainActivity extends ComponentActivity {
                         .build();
                 analysis.setAnalyzer(cameraExecutor, this::analyzeImage);
                 provider.unbindAll();
-                provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
+
+                camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
             } catch (ExecutionException | InterruptedException | RuntimeException ex) {
-                updateStatusUI("❌ Camera Init Failed", "#FEE2E2");
+                updateStatusUI("❌ Camera Init Failed", "statusRed");
             }
         }, ContextCompat.getMainExecutor(this));
     }
@@ -524,38 +594,58 @@ public class MainActivity extends ComponentActivity {
         lastSent = value;
         lastSentAt = now;
 
-        triggerBeep();
-        resetScreenTimeout(); // A successful scan keeps the screen awake
+        if (hidDeviceProxy == null || hidConnectedDevice == null) {
+            triggerErrorBeep();
+            runOnUiThread(() -> toast("Scan failed: Not connected to a computer."));
+            return;
+        }
+
+        triggerSuccessBeep();
+        resetScreenTimeout();
 
         runOnUiThread(() -> lastScanText.setText("📡 Last payload: " + value));
         sendValue(value);
-    }
-
-    private void triggerBeep() {
-        try {
-            if (toneGenerator != null) {
-                toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 150);
-            }
-        } catch (Exception ignored) {}
     }
 
     private void sendManualValue() {
         String value = manualInput.getText().toString().trim();
         if (value.isEmpty()) return;
 
-        triggerBeep();
-        resetScreenTimeout(); // Sending manual data keeps the screen awake
+        if (hidDeviceProxy == null || hidConnectedDevice == null) {
+            triggerErrorBeep();
+            toast("Transmission failed: Not connected to a computer.");
+            return;
+        }
+
+        triggerSuccessBeep();
+        resetScreenTimeout();
         sendValue(value);
 
         manualInput.setText("");
     }
 
+    // Audio Engines
+    private void triggerSuccessBeep() {
+        try {
+            if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 150);
+        } catch (Exception ignored) {}
+    }
+
+    private void triggerConnectBeep() {
+        try {
+            if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_PROMPT, 200);
+        } catch (Exception ignored) {}
+    }
+
+    private void triggerErrorBeep() {
+        try {
+            if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_SUP_ERROR, 350);
+        } catch (Exception ignored) {}
+    }
+
     @SuppressLint("MissingPermission")
     private void sendValue(String value) {
-        if (hidDeviceProxy == null || hidConnectedDevice == null) {
-            runOnUiThread(() -> toast("Transaction Failed: Device link dropped"));
-            return;
-        }
+        if (hidDeviceProxy == null || hidConnectedDevice == null) return;
         new Thread(() -> {
             try {
                 for (char c : (value + "\n").toCharArray()) {
@@ -566,7 +656,7 @@ public class MainActivity extends ComponentActivity {
                     Thread.sleep(12);
                 }
             } catch (Exception ex) {
-                updateStatusUI("❌ Pipeline Error", "#FEE2E2");
+                updateStatusUI("❌ Pipeline Error", "statusRed");
             }
         }).start();
     }
@@ -613,7 +703,7 @@ public class MainActivity extends ComponentActivity {
         super.onDestroy();
         scanner.close();
         cameraExecutor.shutdown();
-        screenHandler.removeCallbacks(screenOffRunnable); // Clean up the timer thread
+        screenHandler.removeCallbacks(screenOffRunnable);
         if (toneGenerator != null) {
             toneGenerator.release();
         }
