@@ -34,6 +34,6 @@ This repository intentionally does not commit `gradle/wrapper/gradle-wrapper.jar
 
 ## Troubleshooting launch crashes
 
-`MainActivity` uses the platform `Activity` class and a platform Material theme to avoid AppCompat startup/theme mismatches on devices where the app previously closed immediately after launch.
+`MainActivity` uses AndroidX `ComponentActivity`, which is a `LifecycleOwner` required by CameraX `bindToLifecycle`, while still avoiding AppCompat theme dependencies.
 
 On Android 12 and newer, Bluetooth APIs can throw a security exception if they are called before the Nearby devices permission is granted. The app requests Bluetooth permission only when you tap **Refresh devices** or **Connect**, then waits for that permission before checking paired devices or connecting; if Bluetooth is off, turn it on from Android settings and tap **Refresh devices**.
