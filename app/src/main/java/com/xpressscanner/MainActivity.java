@@ -18,7 +18,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
+import android.app.Activity;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
@@ -44,7 +44,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
     private static final int PERMISSION_REQUEST = 101;
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
@@ -87,10 +87,14 @@ public class MainActivity extends AppCompatActivity {
         row.setGravity(Gravity.CENTER);
         Button refreshButton = new Button(this);
         refreshButton.setText("Refresh devices");
-        refreshButton.setOnClickListener(v -> loadPairedDevices());
+        refreshButton.setOnClickListener(v -> {
+            if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
+        });
         Button connectButton = new Button(this);
         connectButton.setText("Connect");
-        connectButton.setOnClickListener(v -> connectSelectedDevice());
+        connectButton.setOnClickListener(v -> {
+            if (requestBluetoothPermissionIfNeeded()) connectSelectedDevice();
+        });
         row.addView(refreshButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         row.addView(connectButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         root.addView(row);
@@ -120,12 +124,7 @@ public class MainActivity extends AppCompatActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.CAMERA);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
-        }
         if (permissions.isEmpty()) {
-            loadPairedDevices();
             startCamera();
         } else {
             ActivityCompat.requestPermissions(this, permissions.toArray(new String[0]), PERMISSION_REQUEST);
@@ -136,13 +135,24 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST) {
-            loadPairedDevices();
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                 startCamera();
             } else {
                 statusText.setText("Camera permission is required for scanning.");
             }
+            if (hasBluetoothPermission()) {
+                loadPairedDevices();
+            }
         }
+    }
+
+    private boolean requestBluetoothPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, PERMISSION_REQUEST);
+            return false;
+        }
+        return true;
     }
 
     @SuppressLint("MissingPermission")
