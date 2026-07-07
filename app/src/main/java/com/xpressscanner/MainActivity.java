@@ -5,15 +5,16 @@ import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.app.AlertDialog;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.widget.ArrayAdapter;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.Spinner;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,9 +55,10 @@ public class MainActivity extends ComponentActivity {
     private TextView statusText;
     private TextView lastScanText;
     private EditText manualInput;
-    private Spinner deviceSpinner;
+    private Button deviceButton;
     private BluetoothAdapter bluetoothAdapter;
     private final ArrayList<BluetoothDevice> pairedDevices = new ArrayList<>();
+    private BluetoothDevice selectedDevice;
     private BluetoothSocket socket;
     private OutputStream outputStream;
     private String lastSent = "";
@@ -72,51 +74,92 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void buildLayout() {
+        ScrollView scrollView = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(24, 24, 24, 24);
+        root.setPadding(dp(16), dp(16), dp(16), dp(16));
+        scrollView.addView(root);
+
+        TextView titleText = new TextView(this);
+        titleText.setText("Xpress Scanner");
+        titleText.setTextSize(24);
+        titleText.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.addView(titleText, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         statusText = new TextView(this);
-        statusText.setText("Select a paired Bluetooth device, connect, then scan.");
+        statusText.setText("Choose a paired Bluetooth device, connect, then scan.");
+        statusText.setPadding(0, dp(8), 0, dp(8));
         root.addView(statusText);
 
-        deviceSpinner = new Spinner(this);
-        root.addView(deviceSpinner);
+        deviceButton = new Button(this);
+        deviceButton.setText("Choose Bluetooth device");
+        deviceButton.setAllCaps(false);
+        deviceButton.setOnClickListener(v -> {
+            if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
+        });
+        root.addView(deviceButton, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER);
+        LinearLayout connectionRow = new LinearLayout(this);
+        connectionRow.setGravity(Gravity.CENTER);
         Button refreshButton = new Button(this);
-        refreshButton.setText("Refresh devices");
+        refreshButton.setText("Refresh");
+        refreshButton.setAllCaps(false);
         refreshButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
         Button connectButton = new Button(this);
         connectButton.setText("Connect");
+        connectButton.setAllCaps(false);
         connectButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) connectSelectedDevice();
         });
-        row.addView(refreshButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        row.addView(connectButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        root.addView(row);
+        connectionRow.addView(refreshButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        connectionRow.addView(connectButton, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        root.addView(connectionRow);
 
         previewView = new PreviewView(this);
-        root.addView(previewView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+        previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(280));
+        previewParams.setMargins(0, dp(12), 0, dp(12));
+        root.addView(previewView, previewParams);
 
         lastScanText = new TextView(this);
         lastScanText.setText("Last scan: none");
+        lastScanText.setTextSize(16);
+        lastScanText.setPadding(0, 0, 0, dp(8));
         root.addView(lastScanText);
 
+        LinearLayout manualPanel = new LinearLayout(this);
+        manualPanel.setOrientation(LinearLayout.VERTICAL);
+        manualPanel.setPadding(dp(12), dp(12), dp(12), dp(12));
+        TextView manualTitle = new TextView(this);
+        manualTitle.setText("Manual entry");
+        manualTitle.setTextSize(18);
+        manualPanel.addView(manualTitle);
+
         LinearLayout manualRow = new LinearLayout(this);
+        manualRow.setGravity(Gravity.CENTER_VERTICAL);
         manualInput = new EditText(this);
-        manualInput.setHint("Type barcode / number manually");
+        manualInput.setSingleLine(true);
+        manualInput.setHint("Type barcode or number");
+        manualInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
+        manualInput.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                sendManualValue();
+                return true;
+            }
+            return false;
+        });
         Button sendButton = new Button(this);
         sendButton.setText("Send");
+        sendButton.setAllCaps(false);
         sendButton.setOnClickListener(v -> sendManualValue());
         manualRow.addView(manualInput, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        manualRow.addView(sendButton);
-        root.addView(manualRow);
+        manualRow.addView(sendButton, new LinearLayout.LayoutParams(dp(104), LinearLayout.LayoutParams.WRAP_CONTENT));
+        manualPanel.addView(manualRow);
+        root.addView(manualPanel, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        setContentView(root);
+        setContentView(scrollView);
     }
 
     private void requestNeededPermissions() {
@@ -158,33 +201,65 @@ public class MainActivity extends ComponentActivity {
     @SuppressLint("MissingPermission")
     private void loadPairedDevices() {
         pairedDevices.clear();
-        ArrayList<String> names = new ArrayList<>();
         if (bluetoothAdapter == null) {
-            names.add("Bluetooth not available");
+            selectedDevice = null;
+            deviceButton.setText("Bluetooth not available");
             statusText.setText("This device does not support Bluetooth.");
-        } else if (!hasBluetoothPermission()) {
-            names.add("Bluetooth permission needed");
-            statusText.setText("Grant Nearby devices/Bluetooth permission, then refresh devices.");
-        } else if (!bluetoothAdapter.isEnabled()) {
-            names.add("Bluetooth is off");
-            statusText.setText("Turn on Bluetooth in Android settings, then refresh devices.");
-        } else {
-            Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
-            for (BluetoothDevice device : bondedDevices) {
-                pairedDevices.add(device);
-                String name = device.getName() == null ? "Unknown device" : device.getName();
-                names.add(name + "\n" + device.getAddress());
-            }
-            if (names.isEmpty()) names.add("No paired devices found");
+            return;
         }
-        deviceSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, names));
+        if (!hasBluetoothPermission()) {
+            selectedDevice = null;
+            deviceButton.setText("Bluetooth permission needed");
+            statusText.setText("Grant Nearby devices/Bluetooth permission, then refresh devices.");
+            return;
+        }
+        if (!bluetoothAdapter.isEnabled()) {
+            selectedDevice = null;
+            deviceButton.setText("Bluetooth is off");
+            statusText.setText("Turn on Bluetooth in Android settings, then refresh devices.");
+            return;
+        }
+
+        Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
+        pairedDevices.addAll(bondedDevices);
+        if (pairedDevices.isEmpty()) {
+            selectedDevice = null;
+            deviceButton.setText("No paired devices found");
+            statusText.setText("Pair your PC/Mac in Android Bluetooth settings, then refresh devices.");
+            return;
+        }
+        showBluetoothDeviceDialog();
+    }
+
+    @SuppressLint("MissingPermission")
+    private void showBluetoothDeviceDialog() {
+        String[] labels = new String[pairedDevices.size()];
+        for (int i = 0; i < pairedDevices.size(); i++) {
+            BluetoothDevice device = pairedDevices.get(i);
+            String name = device.getName() == null ? "Unknown device" : device.getName();
+            labels[i] = name + "\n" + device.getAddress();
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Select Bluetooth device")
+                .setItems(labels, (dialog, which) -> {
+                    selectedDevice = pairedDevices.get(which);
+                    String name = selectedDevice.getName() == null ? "Unknown device" : selectedDevice.getName();
+                    deviceButton.setText(name);
+                    statusText.setText("Selected " + name + ". Tap Connect to start sending scans.");
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     @SuppressLint("MissingPermission")
     private void connectSelectedDevice() {
-        int selected = deviceSpinner.getSelectedItemPosition();
-        if (selected < 0 || selected >= pairedDevices.size()) {
-            toast("Pair your PC/Mac in Android Bluetooth settings first.");
+        if (selectedDevice == null) {
+            toast("Choose a paired PC/Mac first.");
+            if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
+            return;
+        }
+        if (bluetoothAdapter == null) {
+            statusText.setText("This device does not support Bluetooth.");
             return;
         }
         if (!hasBluetoothPermission()) {
@@ -195,21 +270,47 @@ public class MainActivity extends ComponentActivity {
             toast("Turn on Bluetooth before connecting.");
             return;
         }
-        BluetoothDevice device = pairedDevices.get(selected);
+        BluetoothDevice device = selectedDevice;
         String deviceName = device.getName() == null ? "selected device" : device.getName();
         statusText.setText("Connecting to " + deviceName + "...");
         new Thread(() -> {
             try {
                 closeConnection();
-                socket = device.createRfcommSocketToServiceRecord(SPP_UUID);
                 bluetoothAdapter.cancelDiscovery();
-                socket.connect();
+                socket = connectBluetoothSocket(device);
                 outputStream = socket.getOutputStream();
-                runOnUiThread(() -> statusText.setText("Connected to " + deviceName));
+                runOnUiThread(() -> statusText.setText("Connected to " + deviceName + ". Scan or send manually."));
             } catch (IOException | SecurityException ex) {
-                runOnUiThread(() -> statusText.setText("Connection failed: " + ex.getMessage()));
+                runOnUiThread(() -> statusText.setText("Connection failed: " + ex.getMessage()
+                        + " Make sure your PC/Mac is paired and running a Bluetooth SPP/RFCOMM receiver."));
             }
         }).start();
+    }
+
+    @SuppressLint("MissingPermission")
+    private BluetoothSocket connectBluetoothSocket(BluetoothDevice device) throws IOException {
+        IOException lastError = null;
+        BluetoothSocket secureSocket = null;
+        try {
+            secureSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
+            secureSocket.connect();
+            return secureSocket;
+        } catch (IOException secureError) {
+            lastError = secureError;
+            closeQuietly(secureSocket);
+        }
+
+        BluetoothSocket insecureSocket = null;
+        try {
+            insecureSocket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
+            insecureSocket.connect();
+            return insecureSocket;
+        } catch (IOException insecureError) {
+            lastError = insecureError;
+            closeQuietly(insecureSocket);
+        }
+
+        throw lastError == null ? new IOException("Unable to connect") : lastError;
     }
 
     private void startCamera() {
@@ -289,6 +390,18 @@ public class MainActivity extends ComponentActivity {
 
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    private void closeQuietly(BluetoothSocket bluetoothSocket) {
+        if (bluetoothSocket == null) return;
+        try {
+            bluetoothSocket.close();
+        } catch (IOException ignored) {
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private void closeConnection() throws IOException {
