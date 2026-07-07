@@ -190,10 +190,18 @@ public class MainActivity extends ComponentActivity {
     }
 
     private boolean requestBluetoothPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, PERMISSION_REQUEST);
-            return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ArrayList<String> permissions = new ArrayList<>();
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                permissions.add(Manifest.permission.BLUETOOTH_SCAN);
+            }
+            if (!permissions.isEmpty()) {
+                ActivityCompat.requestPermissions(this, permissions.toArray(new String[0]), PERMISSION_REQUEST);
+                return false;
+            }
         }
         return true;
     }
@@ -276,7 +284,7 @@ public class MainActivity extends ComponentActivity {
         new Thread(() -> {
             try {
                 closeConnection();
-                bluetoothAdapter.cancelDiscovery();
+                cancelDiscoveryIfAllowed();
                 socket = connectBluetoothSocket(device);
                 outputStream = socket.getOutputStream();
                 runOnUiThread(() -> statusText.setText("Connected to " + deviceName + ". Scan or send manually."));
@@ -385,7 +393,21 @@ public class MainActivity extends ComponentActivity {
 
     private boolean hasBluetoothPermission() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+                (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+                        ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED);
+    }
+
+    @SuppressLint("MissingPermission")
+    private void cancelDiscoveryIfAllowed() {
+        if (bluetoothAdapter == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        try {
+            bluetoothAdapter.cancelDiscovery();
+        } catch (SecurityException ignored) {
+        }
     }
 
     private void toast(String message) {
