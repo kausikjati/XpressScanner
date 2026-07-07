@@ -35,3 +35,5 @@ This repository intentionally does not commit `gradle/wrapper/gradle-wrapper.jar
 ## Troubleshooting launch crashes
 
 `MainActivity` uses `AppCompatActivity`, so the app theme must inherit from an AppCompat theme. If the app closes immediately after launch, confirm `AppTheme` still uses `Theme.AppCompat.Light.NoActionBar` in `app/src/main/res/values/styles.xml`.
+
+On Android 12 and newer, Bluetooth APIs can throw a security exception if they are called before the Nearby devices permission is granted. The app waits for Bluetooth permission before checking paired devices or connecting; if Bluetooth is off, turn it on from Android settings and tap **Refresh devices**.

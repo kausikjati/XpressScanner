@@ -5,12 +5,10 @@ import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -153,14 +151,19 @@ public class MainActivity extends AppCompatActivity {
         ArrayList<String> names = new ArrayList<>();
         if (bluetoothAdapter == null) {
             names.add("Bluetooth not available");
+            statusText.setText("This device does not support Bluetooth.");
+        } else if (!hasBluetoothPermission()) {
+            names.add("Bluetooth permission needed");
+            statusText.setText("Grant Nearby devices/Bluetooth permission, then refresh devices.");
         } else if (!bluetoothAdapter.isEnabled()) {
             names.add("Bluetooth is off");
-            startActivity(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE));
-        } else if (hasBluetoothPermission()) {
+            statusText.setText("Turn on Bluetooth in Android settings, then refresh devices.");
+        } else {
             Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
             for (BluetoothDevice device : bondedDevices) {
                 pairedDevices.add(device);
-                names.add(device.getName() + "\n" + device.getAddress());
+                String name = device.getName() == null ? "Unknown device" : device.getName();
+                names.add(name + "\n" + device.getAddress());
             }
             if (names.isEmpty()) names.add("No paired devices found");
         }
@@ -174,8 +177,17 @@ public class MainActivity extends AppCompatActivity {
             toast("Pair your PC/Mac in Android Bluetooth settings first.");
             return;
         }
+        if (!hasBluetoothPermission()) {
+            toast("Bluetooth permission is required before connecting.");
+            return;
+        }
+        if (!bluetoothAdapter.isEnabled()) {
+            toast("Turn on Bluetooth before connecting.");
+            return;
+        }
         BluetoothDevice device = pairedDevices.get(selected);
-        statusText.setText("Connecting to " + device.getName() + "...");
+        String deviceName = device.getName() == null ? "selected device" : device.getName();
+        statusText.setText("Connecting to " + deviceName + "...");
         new Thread(() -> {
             try {
                 closeConnection();
@@ -183,8 +195,8 @@ public class MainActivity extends AppCompatActivity {
                 bluetoothAdapter.cancelDiscovery();
                 socket.connect();
                 outputStream = socket.getOutputStream();
-                runOnUiThread(() -> statusText.setText("Connected to " + device.getName()));
-            } catch (IOException ex) {
+                runOnUiThread(() -> statusText.setText("Connected to " + deviceName));
+            } catch (IOException | SecurityException ex) {
                 runOnUiThread(() -> statusText.setText("Connection failed: " + ex.getMessage()));
             }
         }).start();
@@ -203,7 +215,7 @@ public class MainActivity extends AppCompatActivity {
                 analysis.setAnalyzer(cameraExecutor, this::analyzeImage);
                 provider.unbindAll();
                 provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
-            } catch (ExecutionException | InterruptedException ex) {
+            } catch (ExecutionException | InterruptedException | RuntimeException ex) {
                 statusText.setText("Unable to start camera: " + ex.getMessage());
             }
         }, ContextCompat.getMainExecutor(this));
