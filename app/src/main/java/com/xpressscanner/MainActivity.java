@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
 import android.bluetooth.BluetoothProfile;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -57,6 +58,7 @@ import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -98,9 +100,13 @@ public class MainActivity extends ComponentActivity {
     private final ArrayList<BluetoothDevice> pairedDevices = new ArrayList<>();
     private BluetoothDevice selectedDevice;
 
+    // Framework State Trackers
     private BluetoothHidDevice hidDeviceProxy;
     private BluetoothDevice hidConnectedDevice;
+    private boolean isAppRegistered = false;
+
     private ToneGenerator toneGenerator;
+    private SharedPreferences prefs;
 
     private String lastSent = "";
     private long lastSentAt = 0L;
@@ -113,6 +119,7 @@ public class MainActivity extends ComponentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        prefs = getSharedPreferences("XpressPrefs", MODE_PRIVATE);
         scanner = BarcodeScanning.getClient();
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
@@ -120,6 +127,26 @@ public class MainActivity extends ComponentActivity {
         buildLayout();
         requestNeededPermissions();
         resetScreenTimeout();
+    }
+
+    // --- LIFECYCLE HEALING MECHANISM ---
+    // This runs every time the app comes back from the background
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (hasBluetoothPermission()) {
+            restoreLastDevice(); // Auto-reload user's PC choice
+
+            if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+                if (hidDeviceProxy == null) {
+                    setupHidProfile(); // Re-establish broken OS proxy
+                } else if (!isAppRegistered) {
+                    registerHidApp();  // Re-register if OS dropped the app
+                } else {
+                    syncConnectionState(); // Sync UI with actual OS connection state
+                }
+            }
+        }
     }
 
     // Locked Dark Theme Color Engine
@@ -393,6 +420,49 @@ public class MainActivity extends ComponentActivity {
         });
     }
 
+    // --- BLUETOOTH SYNC ENGINES ---
+
+    @SuppressLint("MissingPermission")
+    private void restoreLastDevice() {
+        String savedMac = prefs.getString("last_device_mac", null);
+        if (savedMac != null && bluetoothAdapter != null) {
+            Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
+            for (BluetoothDevice device : bondedDevices) {
+                if (device.getAddress().equals(savedMac)) {
+                    selectedDevice = device;
+                    String name = device.getName() == null ? "Unknown Machine" : device.getName();
+                    runOnUiThread(() -> deviceButton.setText(name));
+                    break;
+                }
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void syncConnectionState() {
+        if (hidDeviceProxy != null) {
+            List<BluetoothDevice> connected = hidDeviceProxy.getConnectedDevices();
+            if (!connected.isEmpty()) {
+                hidConnectedDevice = connected.get(0);
+                String name = hidConnectedDevice.getName() == null ? "Unknown Host" : hidConnectedDevice.getName();
+                updateStatusUI("🔗 Connected to: " + name, "statusBlue");
+                runOnUiThread(() -> {
+                    connectButton.setBackground(createCardDrawable(Color.parseColor("#DC2626"), 8));
+                    connectButton.setText("Disconnect");
+                });
+            } else {
+                hidConnectedDevice = null;
+                if (isAppRegistered) {
+                    updateStatusUI("✅ Scanner ready. Select target.", "statusGreen");
+                }
+                runOnUiThread(() -> {
+                    connectButton.setBackground(createCardDrawable(Color.parseColor("#10B981"), 8));
+                    connectButton.setText("Connect (HID)");
+                });
+            }
+        }
+    }
+
     private void requestNeededPermissions() {
         ArrayList<String> permissions = new ArrayList<>();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -463,32 +533,19 @@ public class MainActivity extends ComponentActivity {
         hidDeviceProxy.registerApp(sdpSettings, null, null, ContextCompat.getMainExecutor(this), new BluetoothHidDevice.Callback() {
             @Override
             public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
+                isAppRegistered = registered;
                 if (registered) {
-                    updateStatusUI("✅ Scanner ready. Select target.", "statusGreen");
+                    syncConnectionState(); // Align UI with actual state immediately
+                } else {
+                    updateStatusUI("❌ Scanner unregistered by OS.", "statusRed");
                 }
             }
 
             @Override
             public void onConnectionStateChanged(BluetoothDevice device, int state) {
+                syncConnectionState(); // Centralized UI update logic handles the state mapping
                 if (state == BluetoothProfile.STATE_CONNECTED) {
-                    hidConnectedDevice = device;
-                    String name = device.getName() == null ? "Unknown Host" : device.getName();
-                    updateStatusUI("🔗 Connected to: " + name, "statusBlue");
-
                     triggerConnectBeep();
-
-                    runOnUiThread(() -> {
-                        connectButton.setBackground(createCardDrawable(Color.parseColor("#DC2626"), 8));
-                        connectButton.setText("Disconnect");
-                    });
-                } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
-                    hidConnectedDevice = null;
-                    updateStatusUI("❌ Link broken. Disconnected.", "statusRed");
-
-                    runOnUiThread(() -> {
-                        connectButton.setBackground(createCardDrawable(Color.parseColor("#10B981"), 8));
-                        connectButton.setText("Connect (HID)");
-                    });
                 }
             }
         });
@@ -515,6 +572,8 @@ public class MainActivity extends ComponentActivity {
                 .setTitle("Select Host Target")
                 .setItems(labels, (dialog, which) -> {
                     selectedDevice = pairedDevices.get(which);
+                    prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply(); // Cache selection
+
                     String name = selectedDevice.getName() == null ? "Unknown Machine" : selectedDevice.getName();
                     deviceButton.setText(name);
                 }).show();
@@ -523,7 +582,13 @@ public class MainActivity extends ComponentActivity {
     @SuppressLint("MissingPermission")
     private void toggleConnection() {
         if (hidDeviceProxy == null) {
-            toast("Core link framework dead. Restart execution.");
+            toast("Framework restarting. Please wait...");
+            setupHidProfile();
+            return;
+        }
+        if (!isAppRegistered) {
+            toast("Registering scanner. Please wait...");
+            registerHidApp();
             return;
         }
 
@@ -535,6 +600,8 @@ public class MainActivity extends ComponentActivity {
                 toast("Choose a paired configuration first.");
                 return;
             }
+            prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
+
             updateStatusUI("⏳ Connecting HID Framework...", "statusYellow");
             hidDeviceProxy.connect(selectedDevice);
         }
