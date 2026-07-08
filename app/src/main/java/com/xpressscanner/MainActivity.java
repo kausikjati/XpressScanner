@@ -32,6 +32,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -57,8 +58,11 @@ import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -129,42 +133,38 @@ public class MainActivity extends ComponentActivity {
         resetScreenTimeout();
     }
 
-    // --- LIFECYCLE HEALING MECHANISM ---
-    // This runs every time the app comes back from the background
     @Override
     protected void onResume() {
         super.onResume();
         if (hasBluetoothPermission()) {
-            restoreLastDevice(); // Auto-reload user's PC choice
-
+            restoreLastDevice();
             if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
                 if (hidDeviceProxy == null) {
-                    setupHidProfile(); // Re-establish broken OS proxy
+                    setupHidProfile();
                 } else if (!isAppRegistered) {
-                    registerHidApp();  // Re-register if OS dropped the app
+                    registerHidApp();
                 } else {
-                    syncConnectionState(); // Sync UI with actual OS connection state
+                    syncConnectionState();
                 }
             }
         }
     }
 
-    // Locked Dark Theme Color Engine
     private int color(String key) {
         switch(key) {
-            case "bg": return Color.parseColor("#0F172A"); // Slate 900
-            case "card": return Color.parseColor("#1E293B"); // Slate 800
-            case "pillDefault": return Color.parseColor("#334155"); // Slate 700
-            case "textMain": return Color.parseColor("#F8FAFC"); // Slate 50
-            case "textSub": return Color.parseColor("#94A3B8"); // Slate 400
-            case "btnNormal": return Color.parseColor("#334155");
-            case "btnRefresh": return Color.parseColor("#475569");
-            case "inputBg": return Color.parseColor("#0F172A");
-            case "inputStroke": return Color.parseColor("#334155");
-            case "statusGreen": return Color.parseColor("#065F46");
-            case "statusBlue": return Color.parseColor("#1E40AF");
-            case "statusRed": return Color.parseColor("#991B1B");
-            case "statusYellow": return Color.parseColor("#92400E");
+            case "bg": return Color.parseColor("#060A16"); // Deep Cyber Navy
+            case "card": return Color.parseColor("#12192B"); // Lighter Navy Card
+            case "cardStroke": return Color.parseColor("#1E293B"); // Card Outline
+            case "pillConnected": return Color.parseColor("#1D4ED8"); // Neon Blue
+            case "pillDefault": return Color.parseColor("#1E293B"); // Slate
+            case "textMain": return Color.parseColor("#F8FAFC");
+            case "textSub": return Color.parseColor("#94A3B8");
+            case "btnRefresh": return Color.parseColor("#334155"); // Grey/Slate
+            case "btnDisconnect": return Color.parseColor("#F87171"); // Coral Red
+            case "btnConnect": return Color.parseColor("#10B981"); // Emerald
+            case "inputBg": return Color.parseColor("#060A16"); // Input inner dark
+            case "btnSend": return Color.parseColor("#6366F1"); // Indigo Purple
+            case "accentGreen": return Color.parseColor("#34D399"); // Scan Text
             default: return Color.WHITE;
         }
     }
@@ -189,7 +189,6 @@ public class MainActivity extends ComponentActivity {
         root.setBackgroundColor(color("bg"));
         root.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
-        // Enforce Safe Area
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(dp(16) + insets.left, dp(20) + insets.top, dp(16) + insets.right, dp(20) + insets.bottom);
@@ -207,13 +206,14 @@ public class MainActivity extends ComponentActivity {
         statusCard = new LinearLayout(this);
         statusCard.setOrientation(LinearLayout.HORIZONTAL);
         statusCard.setGravity(Gravity.CENTER);
-        statusCard.setBackground(createCardDrawable(color("pillDefault"), 24));
+        statusCard.setBackground(createCardDrawable(color("pillDefault"), 0, 24));
         statusCard.setPadding(dp(16), dp(10), dp(16), dp(10));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        cardParams.setMargins(0, 0, dp(12), 0);
         statusCard.setLayoutParams(cardParams);
 
         statusText = new TextView(this);
-        statusText.setText("🔄 Initializing system...");
+        statusText.setText("🔌 Initializing system...");
         statusText.setTextSize(14);
         statusText.setTextColor(color("textMain"));
         statusText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
@@ -224,9 +224,9 @@ public class MainActivity extends ComponentActivity {
         // Info Button
         ImageButton infoButton = new ImageButton(this);
         infoButton.setImageResource(android.R.drawable.ic_dialog_info);
-        infoButton.setBackground(null);
-        infoButton.setColorFilter(color("textMain"));
-        infoButton.setPadding(dp(12), dp(10), dp(4), dp(10));
+        infoButton.setBackground(createCardDrawable(Color.WHITE, 0, 24));
+        infoButton.setColorFilter(Color.BLACK);
+        infoButton.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
         infoButton.setOnClickListener(v -> showInstructionsDialog());
         headerRow.addView(infoButton);
 
@@ -235,7 +235,7 @@ public class MainActivity extends ComponentActivity {
         // Bluetooth Panel
         LinearLayout btPanel = new LinearLayout(this);
         btPanel.setOrientation(LinearLayout.VERTICAL);
-        btPanel.setBackground(createCardDrawable(color("card"), 12));
+        btPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 12));
         btPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
 
         deviceButton = new Button(this);
@@ -243,7 +243,7 @@ public class MainActivity extends ComponentActivity {
         deviceButton.setAllCaps(false);
         deviceButton.setTextSize(15);
         deviceButton.setTextColor(color("textMain"));
-        deviceButton.setBackground(createCardDrawable(color("btnNormal"), 8));
+        deviceButton.setBackground(createCardDrawable(color("bg"), color("cardStroke"), 8));
         deviceButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
@@ -256,20 +256,20 @@ public class MainActivity extends ComponentActivity {
         actionRow.setLayoutParams(rowParams);
 
         Button refreshButton = new Button(this);
-        refreshButton.setText("Refresh");
+        refreshButton.setText("🔄 Refresh");
         refreshButton.setAllCaps(false);
         refreshButton.setTextColor(color("textMain"));
-        refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 8));
+        refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 0, 8));
         refreshButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
 
         connectButton = new Button(this);
-        connectButton.setText("Connect (HID)");
+        connectButton.setText("Connect");
         connectButton.setAllCaps(false);
         connectButton.setTextColor(Color.WHITE);
         connectButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        connectButton.setBackground(createCardDrawable(Color.parseColor("#10B981"), 8));
+        connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 8));
         connectButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) toggleConnection();
         });
@@ -290,7 +290,7 @@ public class MainActivity extends ComponentActivity {
         cameraContainerParams.setMargins(0, dp(16), 0, dp(16));
         cameraContainer.setLayoutParams(cameraContainerParams);
 
-        cameraContainer.setBackground(createCardDrawable(Color.parseColor("#000000"), 12));
+        cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("pillConnected"), 16));
         cameraContainer.setClipToOutline(true);
 
         previewView = new PreviewView(this);
@@ -300,11 +300,12 @@ public class MainActivity extends ComponentActivity {
         barcodeOverlayView = new BarcodeOverlayView(this);
         cameraContainer.addView(barcodeOverlayView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Floating Camera Flash Toggle
+        // Floating Flash Toggle
         Button flashButton = new Button(this);
         flashButton.setText("⚡");
         flashButton.setTextSize(18);
-        flashButton.setBackground(createCardDrawable(Color.parseColor("#88000000"), 24));
+        flashButton.setTextColor(Color.parseColor("#FBBF24")); // Yellow bolt
+        flashButton.setBackground(createCardDrawable(Color.parseColor("#88000000"), 0, 24));
         FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(dp(44), dp(44));
         flashParams.gravity = Gravity.BOTTOM | Gravity.END;
         flashParams.setMargins(0, 0, dp(12), dp(12));
@@ -313,26 +314,37 @@ public class MainActivity extends ComponentActivity {
             if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
                 isFlashOn = !isFlashOn;
                 camera.getCameraControl().enableTorch(isFlashOn);
-                flashButton.setBackground(createCardDrawable(Color.parseColor(isFlashOn ? "#AA10B981" : "#88000000"), 24));
+                flashButton.setBackground(createCardDrawable(Color.parseColor(isFlashOn ? "#AA1D4ED8" : "#88000000"), 0, 24));
             } else {
-                toast("Flash not supported on this lens.");
+                toast("Flash not supported.");
             }
         });
         cameraContainer.addView(flashButton);
 
         root.addView(cameraContainer);
 
-        // Realtime Scan Logs Card
-        LinearLayout logsCard = new LinearLayout(this);
-        logsCard.setBackground(createCardDrawable(Color.parseColor("#0F172A"), 12));
-        logsCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+        // History Row
+        LinearLayout historyRow = new LinearLayout(this);
+        historyRow.setOrientation(LinearLayout.HORIZONTAL);
+        historyRow.setGravity(Gravity.CENTER_VERTICAL);
+        historyRow.setPadding(dp(8), 0, dp(8), 0);
+
+        Button historyBtn = new Button(this);
+        historyBtn.setText("🕒");
+        historyBtn.setBackground(null);
+        historyBtn.setTextSize(16);
+        historyBtn.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(40)));
+        historyBtn.setOnClickListener(v -> showHistoryDialog());
+        historyRow.addView(historyBtn);
+
         lastScanText = new TextView(this);
         lastScanText.setText("Last scan: Ready for data...");
-        lastScanText.setTextColor(Color.parseColor("#34D399"));
+        lastScanText.setTextColor(color("accentGreen"));
         lastScanText.setTextSize(14);
         lastScanText.setTypeface(android.graphics.Typeface.MONOSPACE);
-        logsCard.addView(lastScanText);
-        root.addView(logsCard);
+        historyRow.addView(lastScanText);
+
+        root.addView(historyRow);
 
         // Flexible Spacer
         Space spacer = new Space(this);
@@ -341,10 +353,10 @@ public class MainActivity extends ComponentActivity {
         // Manual Intervention Console
         LinearLayout manualPanel = new LinearLayout(this);
         manualPanel.setOrientation(LinearLayout.VERTICAL);
-        manualPanel.setBackground(createCardDrawable(color("card"), 12));
-        manualPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
+        manualPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 12));
+        manualPanel.setPadding(dp(12), dp(12), dp(12), dp(12));
         LinearLayout.LayoutParams manualParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        manualParams.setMargins(0, dp(16), 0, 0);
+        manualParams.setMargins(0, dp(8), 0, 0);
         manualPanel.setLayoutParams(manualParams);
 
         LinearLayout manualRow = new LinearLayout(this);
@@ -352,17 +364,13 @@ public class MainActivity extends ComponentActivity {
 
         manualInput = new EditText(this);
         manualInput.setSingleLine(true);
-        manualInput.setHint("Input value manually...");
+        manualInput.setHint("Input value manually... ✏️");
         manualInput.setHintTextColor(color("textSub"));
         manualInput.setTextColor(color("textMain"));
         manualInput.setTextSize(15);
         manualInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
 
-        GradientDrawable etBg = new GradientDrawable();
-        etBg.setColor(color("inputBg"));
-        etBg.setStroke(dp(1), color("inputStroke"));
-        etBg.setCornerRadius(dp(6));
-        manualInput.setBackground(etBg);
+        manualInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 8));
         manualInput.setPadding(dp(12), dp(10), dp(12), dp(10));
 
         manualInput.setOnEditorActionListener((v, actionId, event) -> {
@@ -373,42 +381,190 @@ public class MainActivity extends ComponentActivity {
             return false;
         });
 
-        ImageButton sendButton = new ImageButton(this);
-        sendButton.setImageResource(android.R.drawable.ic_menu_send);
-        sendButton.setColorFilter(Color.WHITE);
-        sendButton.setBackground(createCardDrawable(Color.parseColor("#4F46E5"), 6));
+        Button sendButton = new Button(this);
+        sendButton.setText("✈️✨");
+        sendButton.setTextSize(14);
+        sendButton.setTextColor(Color.WHITE);
+        sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 8));
         sendButton.setOnClickListener(v -> sendManualValue());
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         inputParams.setMargins(0, 0, dp(10), 0);
         manualRow.addView(manualInput, inputParams);
-        manualRow.addView(sendButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        manualRow.addView(sendButton, new LinearLayout.LayoutParams(dp(56), dp(44)));
         manualPanel.addView(manualRow);
         root.addView(manualPanel);
 
         setContentView(root);
     }
 
+    // --- SCAN HISTORY SYSTEM ---
+    private void saveScanToHistory(String value) {
+        String history = prefs.getString("scan_history", "");
+        long now = System.currentTimeMillis();
+        String newEntry = now + "|" + value + "|||";
+        prefs.edit().putString("scan_history", newEntry + history).apply();
+    }
+
+    private void showHistoryDialog() {
+        String history = prefs.getString("scan_history", "");
+        long twoDaysMillis = 2L * 24 * 60 * 60 * 1000;
+        long cutoffTime = System.currentTimeMillis() - twoDaysMillis;
+
+        LinearLayout dialogLayout = new LinearLayout(this);
+        dialogLayout.setOrientation(LinearLayout.VERTICAL);
+        dialogLayout.setPadding(dp(16), dp(16), dp(16), dp(16));
+        dialogLayout.setBackgroundColor(color("bg"));
+
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout listLayout = new LinearLayout(this);
+        listLayout.setOrientation(LinearLayout.VERTICAL);
+
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, HH:mm:ss", Locale.getDefault());
+        boolean hasData = false;
+
+        if (!history.isEmpty()) {
+            String[] entries = history.split("\\|\\|\\|");
+            StringBuilder updatedHistory = new StringBuilder();
+
+            for (String entry : entries) {
+                if (entry.trim().isEmpty()) continue;
+                String[] parts = entry.split("\\|");
+                if (parts.length == 2) {
+                    try {
+                        long timestamp = Long.parseLong(parts[0]);
+                        String scannedData = parts[1];
+
+                        if (timestamp >= cutoffTime) {
+                            updatedHistory.append(entry).append("|||");
+                            hasData = true;
+
+                            // Create Individual History Card
+                            LinearLayout itemCard = new LinearLayout(this);
+                            itemCard.setOrientation(LinearLayout.VERTICAL);
+                            itemCard.setBackground(createCardDrawable(color("card"), color("cardStroke"), 8));
+                            itemCard.setPadding(dp(12), dp(12), dp(12), dp(12));
+
+                            // Time and Data Text
+                            TextView timeTv = new TextView(this);
+                            timeTv.setText(sdf.format(new Date(timestamp)));
+                            timeTv.setTextColor(color("textSub"));
+                            timeTv.setTextSize(12);
+                            itemCard.addView(timeTv);
+
+                            TextView valTv = new TextView(this);
+                            valTv.setText(scannedData);
+                            valTv.setTextColor(color("textMain"));
+                            valTv.setTextSize(16);
+                            valTv.setTypeface(android.graphics.Typeface.MONOSPACE);
+                            valTv.setPadding(0, dp(4), 0, 0);
+                            itemCard.addView(valTv);
+
+                            // Action Buttons Row
+                            LinearLayout btnRow = new LinearLayout(this);
+                            btnRow.setOrientation(LinearLayout.HORIZONTAL);
+                            btnRow.setGravity(Gravity.END);
+                            LinearLayout.LayoutParams btnRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            btnRowParams.setMargins(0, dp(8), 0, 0);
+                            btnRow.setLayoutParams(btnRowParams);
+
+                            Button copyBtn = new Button(this);
+                            copyBtn.setText("📋 Copy");
+                            copyBtn.setAllCaps(false);
+                            copyBtn.setTextSize(12);
+                            copyBtn.setTextColor(color("textMain"));
+                            copyBtn.setBackground(createCardDrawable(color("btnRefresh"), 0, 6));
+                            copyBtn.setPadding(dp(12), 0, dp(12), 0);
+                            copyBtn.setOnClickListener(v -> {
+                                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                                android.content.ClipData clip = android.content.ClipData.newPlainText("Barcode", scannedData);
+                                clipboard.setPrimaryClip(clip);
+                                toast("Copied!");
+                            });
+
+                            Button sendBtn = new Button(this);
+                            sendBtn.setText("✈️ Send");
+                            sendBtn.setAllCaps(false);
+                            sendBtn.setTextSize(12);
+                            sendBtn.setTextColor(Color.WHITE);
+                            sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 6));
+                            sendBtn.setPadding(dp(12), 0, dp(12), 0);
+                            sendBtn.setOnClickListener(v -> {
+                                if (hidDeviceProxy == null || hidConnectedDevice == null) {
+                                    triggerErrorBeep();
+                                    toast("Transmission failed: Not connected.");
+                                } else {
+                                    triggerSuccessBeep();
+                                    sendValue(scannedData);
+                                }
+                            });
+
+                            LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36));
+                            btnParams.setMargins(dp(8), 0, 0, 0);
+
+                            btnRow.addView(copyBtn, btnParams);
+                            btnRow.addView(sendBtn, btnParams);
+                            itemCard.addView(btnRow);
+
+                            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            lp.setMargins(0, 0, 0, dp(8));
+                            listLayout.addView(itemCard, lp);
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            prefs.edit().putString("scan_history", updatedHistory.toString()).apply();
+        }
+
+        if (!hasData) {
+            TextView empty = new TextView(this);
+            empty.setText("No scans in the last 48 hours.");
+            empty.setTextColor(color("textSub"));
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(0, dp(32), 0, dp(32));
+            listLayout.addView(empty);
+        }
+
+        scrollView.addView(listLayout);
+        dialogLayout.addView(scrollView);
+
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle("Last 48 Hours History")
+                .setView(dialogLayout)
+                .setPositiveButton("Close", null)
+                .setNegativeButton("Clear All", (d, w) -> {
+                    prefs.edit().remove("scan_history").apply();
+                    toast("History cleared");
+                })
+                .show();
+
+        int titleId = getResources().getIdentifier("alertTitle", "id", "android");
+        TextView titleTv = dialog.findViewById(titleId);
+        if (titleTv != null) titleTv.setTextColor(Color.WHITE);
+        dialog.getWindow().setBackgroundDrawable(createCardDrawable(color("card"), color("cardStroke"), 12));
+    }
+
     private void showInstructionsDialog() {
         String instructions = "1. Pair your Devices\n" +
-                "Open your phone's standard Android Settings > Bluetooth, and pair your phone with your Mac/PC.\n\n" +
+                "Open your phone's Android Settings > Bluetooth, and pair your phone with your Mac/PC.\n\n" +
                 "2. Start the Framework\n" +
-                "Open this app. Wait for the top banner to say \"✅ Scanner ready\". Your phone is now actively mimicking a wireless keyboard.\n\n" +
+                "Wait for the top banner to say \"✅ Scanner ready\".\n\n" +
                 "3. Connect to Computer\n" +
-                "Tap \"Select Bluetooth Device\" and choose your computer. Then tap \"Connect (HID)\".\n\n" +
+                "Tap \"Select Bluetooth Device\" and choose your computer. Tap \"Connect\".\n\n" +
                 "4. Scan Barcodes\n" +
-                "Click into any text field on your computer. Point your camera at a barcode. The app will automatically type the code on your computer and hit Enter!";
+                "Point your camera at a barcode. The app will beam it directly to your computer!";
 
         new AlertDialog.Builder(this)
-                .setTitle("How to Use Xpress Scanner")
+                .setTitle("How to Use Scanner")
                 .setMessage(instructions)
                 .setPositiveButton("Got it", null)
                 .show();
     }
 
-    private GradientDrawable createCardDrawable(int colorInt, int radiusDp) {
+    private GradientDrawable createCardDrawable(int bgColor, int strokeColor, int radiusDp) {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(colorInt);
+        drawable.setColor(bgColor);
+        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
         drawable.setCornerRadius(dp(radiusDp));
         return drawable;
     }
@@ -416,7 +572,7 @@ public class MainActivity extends ComponentActivity {
     private void updateStatusUI(String message, String colorKey) {
         runOnUiThread(() -> {
             statusText.setText(message);
-            statusCard.setBackground(createCardDrawable(color(colorKey), 24));
+            statusCard.setBackground(createCardDrawable(color(colorKey), 0, 24));
         });
     }
 
@@ -445,19 +601,19 @@ public class MainActivity extends ComponentActivity {
             if (!connected.isEmpty()) {
                 hidConnectedDevice = connected.get(0);
                 String name = hidConnectedDevice.getName() == null ? "Unknown Host" : hidConnectedDevice.getName();
-                updateStatusUI("🔗 Connected to: " + name, "statusBlue");
+                updateStatusUI("🔗 Connected to: " + name, "pillConnected");
                 runOnUiThread(() -> {
-                    connectButton.setBackground(createCardDrawable(Color.parseColor("#DC2626"), 8));
-                    connectButton.setText("Disconnect");
+                    connectButton.setBackground(createCardDrawable(color("btnDisconnect"), 0, 8));
+                    connectButton.setText("❌ Disconnect");
                 });
             } else {
                 hidConnectedDevice = null;
                 if (isAppRegistered) {
-                    updateStatusUI("✅ Scanner ready. Select target.", "statusGreen");
+                    updateStatusUI("✅ Scanner ready. Select target.", "pillDefault");
                 }
                 runOnUiThread(() -> {
-                    connectButton.setBackground(createCardDrawable(Color.parseColor("#10B981"), 8));
-                    connectButton.setText("Connect (HID)");
+                    connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 8));
+                    connectButton.setText("Connect");
                 });
             }
         }
@@ -483,7 +639,7 @@ public class MainActivity extends ComponentActivity {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                 startCamera();
             } else {
-                updateStatusUI("❌ Camera denied. Scanning disabled.", "statusRed");
+                updateStatusUI("❌ Camera denied. Scanning disabled.", "btnDisconnect");
             }
             if (hasBluetoothPermission()) {
                 setupHidProfile();
@@ -535,15 +691,15 @@ public class MainActivity extends ComponentActivity {
             public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
                 isAppRegistered = registered;
                 if (registered) {
-                    syncConnectionState(); // Align UI with actual state immediately
+                    syncConnectionState();
                 } else {
-                    updateStatusUI("❌ Scanner unregistered by OS.", "statusRed");
+                    updateStatusUI("❌ Scanner unregistered.", "btnDisconnect");
                 }
             }
 
             @Override
             public void onConnectionStateChanged(BluetoothDevice device, int state) {
-                syncConnectionState(); // Centralized UI update logic handles the state mapping
+                syncConnectionState();
                 if (state == BluetoothProfile.STATE_CONNECTED) {
                     triggerConnectBeep();
                 }
@@ -572,8 +728,7 @@ public class MainActivity extends ComponentActivity {
                 .setTitle("Select Host Target")
                 .setItems(labels, (dialog, which) -> {
                     selectedDevice = pairedDevices.get(which);
-                    prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply(); // Cache selection
-
+                    prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
                     String name = selectedDevice.getName() == null ? "Unknown Machine" : selectedDevice.getName();
                     deviceButton.setText(name);
                 }).show();
@@ -593,7 +748,7 @@ public class MainActivity extends ComponentActivity {
         }
 
         if (hidConnectedDevice != null) {
-            updateStatusUI("⏳ Disconnecting...", "statusYellow");
+            updateStatusUI("⏳ Disconnecting...", "pillDefault");
             hidDeviceProxy.disconnect(hidConnectedDevice);
         } else {
             if (selectedDevice == null) {
@@ -602,7 +757,7 @@ public class MainActivity extends ComponentActivity {
             }
             prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
 
-            updateStatusUI("⏳ Connecting HID Framework...", "statusYellow");
+            updateStatusUI("⏳ Connecting HID Framework...", "pillDefault");
             hidDeviceProxy.connect(selectedDevice);
         }
     }
@@ -622,7 +777,7 @@ public class MainActivity extends ComponentActivity {
 
                 camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
             } catch (ExecutionException | InterruptedException | RuntimeException ex) {
-                updateStatusUI("❌ Camera Init Failed", "statusRed");
+                updateStatusUI("❌ Camera Init Failed", "btnDisconnect");
             }
         }, ContextCompat.getMainExecutor(this));
     }
@@ -669,8 +824,9 @@ public class MainActivity extends ComponentActivity {
 
         triggerSuccessBeep();
         resetScreenTimeout();
+        saveScanToHistory(value);
 
-        runOnUiThread(() -> lastScanText.setText("📡 Last payload: " + value));
+        runOnUiThread(() -> lastScanText.setText("Last scan: " + value));
         sendValue(value);
     }
 
@@ -686,28 +842,22 @@ public class MainActivity extends ComponentActivity {
 
         triggerSuccessBeep();
         resetScreenTimeout();
+        saveScanToHistory(value);
         sendValue(value);
 
         manualInput.setText("");
     }
 
-    // Audio Engines
     private void triggerSuccessBeep() {
-        try {
-            if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 150);
-        } catch (Exception ignored) {}
+        try { if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 150); } catch (Exception ignored) {}
     }
 
     private void triggerConnectBeep() {
-        try {
-            if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_PROMPT, 200);
-        } catch (Exception ignored) {}
+        try { if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_PROMPT, 200); } catch (Exception ignored) {}
     }
 
     private void triggerErrorBeep() {
-        try {
-            if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_SUP_ERROR, 350);
-        } catch (Exception ignored) {}
+        try { if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_SUP_ERROR, 350); } catch (Exception ignored) {}
     }
 
     @SuppressLint("MissingPermission")
@@ -723,7 +873,7 @@ public class MainActivity extends ComponentActivity {
                     Thread.sleep(12);
                 }
             } catch (Exception ex) {
-                updateStatusUI("❌ Pipeline Error", "statusRed");
+                updateStatusUI("❌ Pipeline Error", "btnDisconnect");
             }
         }).start();
     }
@@ -771,26 +921,34 @@ public class MainActivity extends ComponentActivity {
         scanner.close();
         cameraExecutor.shutdown();
         screenHandler.removeCallbacks(screenOffRunnable);
-        if (toneGenerator != null) {
-            toneGenerator.release();
-        }
-        if (hidDeviceProxy != null) {
-            bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDeviceProxy);
-        }
+        if (toneGenerator != null) toneGenerator.release();
+        if (hidDeviceProxy != null) bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDeviceProxy);
     }
 
+    // Modern Camera Overlay
     private static class BarcodeOverlayView extends View {
-        private final Paint paint;
+        private final Paint bracketPaint;
+        private final Paint boxPaint;
         private final RectF calculatedRect = new RectF();
         private boolean hasTarget = false;
+        private final float padding = 40f;
+        private final float bracketLength = 60f;
 
         public BarcodeOverlayView(Context context) {
             super(context);
-            paint = new Paint();
-            paint.setColor(Color.parseColor("#10B981"));
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(6f);
-            paint.setAntiAlias(true);
+
+            bracketPaint = new Paint();
+            bracketPaint.setColor(Color.parseColor("#334155"));
+            bracketPaint.setStyle(Paint.Style.STROKE);
+            bracketPaint.setStrokeWidth(12f);
+            bracketPaint.setStrokeCap(Paint.Cap.ROUND);
+            bracketPaint.setAntiAlias(true);
+
+            boxPaint = new Paint();
+            boxPaint.setColor(Color.parseColor("#10B981")); // Emerald Green Box
+            boxPaint.setStyle(Paint.Style.STROKE);
+            boxPaint.setStrokeWidth(8f);
+            boxPaint.setAntiAlias(true);
         }
 
         public void updateBox(Rect rect, int imageWidth, int imageHeight) {
@@ -816,8 +974,25 @@ public class MainActivity extends ComponentActivity {
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+
+            // Draw 4 corner brackets
+            canvas.drawLine(padding, padding + bracketLength, padding, padding, bracketPaint);
+            canvas.drawLine(padding, padding, padding + bracketLength, padding, bracketPaint);
+
+            canvas.drawLine(w - padding - bracketLength, padding, w - padding, padding, bracketPaint);
+            canvas.drawLine(w - padding, padding, w - padding, padding + bracketLength, bracketPaint);
+
+            canvas.drawLine(padding, h - padding - bracketLength, padding, h - padding, bracketPaint);
+            canvas.drawLine(padding, h - padding, padding + bracketLength, h - padding, bracketPaint);
+
+            canvas.drawLine(w - padding - bracketLength, h - padding, w - padding, h - padding, bracketPaint);
+            canvas.drawLine(w - padding, h - padding, w - padding, h - padding - bracketLength, bracketPaint);
+
+            // Draw Dynamic Green Bounding Box around the code
             if (hasTarget) {
-                canvas.drawRoundRect(calculatedRect, 12f, 12f, paint);
+                canvas.drawRoundRect(calculatedRect, 16f, 16f, boxPaint);
             }
         }
     }
