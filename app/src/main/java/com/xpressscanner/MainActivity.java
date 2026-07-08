@@ -31,6 +31,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Space;
@@ -152,19 +153,19 @@ public class MainActivity extends ComponentActivity {
 
     private int color(String key) {
         switch(key) {
-            case "bg": return Color.parseColor("#060A16"); // Deep Cyber Navy
-            case "card": return Color.parseColor("#12192B"); // Lighter Navy Card
-            case "cardStroke": return Color.parseColor("#1E293B"); // Card Outline
-            case "pillConnected": return Color.parseColor("#1D4ED8"); // Neon Blue
-            case "pillDefault": return Color.parseColor("#1E293B"); // Slate
+            case "bg": return Color.parseColor("#060A16");
+            case "card": return Color.parseColor("#12192B");
+            case "cardStroke": return Color.parseColor("#1E293B");
+            case "pillConnected": return Color.parseColor("#1D4ED8");
+            case "pillDefault": return Color.parseColor("#1E293B");
             case "textMain": return Color.parseColor("#F8FAFC");
             case "textSub": return Color.parseColor("#94A3B8");
-            case "btnRefresh": return Color.parseColor("#334155"); // Grey/Slate
-            case "btnDisconnect": return Color.parseColor("#F87171"); // Coral Red
-            case "btnConnect": return Color.parseColor("#10B981"); // Emerald
-            case "inputBg": return Color.parseColor("#060A16"); // Input inner dark
-            case "btnSend": return Color.parseColor("#6366F1"); // Indigo Purple
-            case "accentGreen": return Color.parseColor("#34D399"); // Scan Text
+            case "btnRefresh": return Color.parseColor("#334155");
+            case "btnDisconnect": return Color.parseColor("#F87171");
+            case "btnConnect": return Color.parseColor("#10B981");
+            case "inputBg": return Color.parseColor("#060A16");
+            case "btnSend": return Color.parseColor("#6366F1");
+            case "accentGreen": return Color.parseColor("#34D399");
             default: return Color.WHITE;
         }
     }
@@ -224,9 +225,11 @@ public class MainActivity extends ComponentActivity {
         // Info Button
         ImageButton infoButton = new ImageButton(this);
         infoButton.setImageResource(android.R.drawable.ic_dialog_info);
-        infoButton.setBackground(createCardDrawable(Color.WHITE, 0, 24));
+        infoButton.setBackground(createCardDrawable(Color.WHITE, 0, 15));
         infoButton.setColorFilter(Color.BLACK);
-        infoButton.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+        infoButton.setPadding(dp(6), dp(6), dp(6), dp(6));
+        infoButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        infoButton.setLayoutParams(new LinearLayout.LayoutParams(dp(30), dp(30)));
         infoButton.setOnClickListener(v -> showInstructionsDialog());
         headerRow.addView(infoButton);
 
@@ -381,17 +384,18 @@ public class MainActivity extends ComponentActivity {
             return false;
         });
 
-        Button sendButton = new Button(this);
-        sendButton.setText("✈️✨");
-        sendButton.setTextSize(14);
-        sendButton.setTextColor(Color.WHITE);
+        // Icon Based Manual Send Button
+        ImageButton sendButton = new ImageButton(this);
+        sendButton.setImageResource(android.R.drawable.ic_menu_send);
+        sendButton.setColorFilter(Color.WHITE);
         sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 8));
+        sendButton.setPadding(dp(12), dp(8), dp(12), dp(8));
         sendButton.setOnClickListener(v -> sendManualValue());
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         inputParams.setMargins(0, 0, dp(10), 0);
         manualRow.addView(manualInput, inputParams);
-        manualRow.addView(sendButton, new LinearLayout.LayoutParams(dp(56), dp(44)));
+        manualRow.addView(sendButton, new LinearLayout.LayoutParams(dp(50), dp(44)));
         manualPanel.addView(manualRow);
         root.addView(manualPanel);
 
@@ -468,13 +472,12 @@ public class MainActivity extends ComponentActivity {
                             btnRowParams.setMargins(0, dp(8), 0, 0);
                             btnRow.setLayoutParams(btnRowParams);
 
-                            Button copyBtn = new Button(this);
-                            copyBtn.setText("📋 Copy");
-                            copyBtn.setAllCaps(false);
-                            copyBtn.setTextSize(12);
-                            copyBtn.setTextColor(color("textMain"));
+                            // Copy Button (Icon Only)
+                            ImageButton copyBtn = new ImageButton(this);
+                            copyBtn.setImageResource(android.R.drawable.ic_menu_agenda); // Native clipboard-like icon
+                            copyBtn.setColorFilter(color("textMain"));
                             copyBtn.setBackground(createCardDrawable(color("btnRefresh"), 0, 6));
-                            copyBtn.setPadding(dp(12), 0, dp(12), 0);
+                            copyBtn.setPadding(dp(10), dp(6), dp(10), dp(6));
                             copyBtn.setOnClickListener(v -> {
                                 android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                                 android.content.ClipData clip = android.content.ClipData.newPlainText("Barcode", scannedData);
@@ -482,13 +485,12 @@ public class MainActivity extends ComponentActivity {
                                 toast("Copied!");
                             });
 
-                            Button sendBtn = new Button(this);
-                            sendBtn.setText("✈️ Send");
-                            sendBtn.setAllCaps(false);
-                            sendBtn.setTextSize(12);
-                            sendBtn.setTextColor(Color.WHITE);
+                            // Send Button (Icon Only)
+                            ImageButton sendBtn = new ImageButton(this);
+                            sendBtn.setImageResource(android.R.drawable.ic_menu_send); // Native paper plane icon
+                            sendBtn.setColorFilter(Color.WHITE);
                             sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 6));
-                            sendBtn.setPadding(dp(12), 0, dp(12), 0);
+                            sendBtn.setPadding(dp(10), dp(6), dp(10), dp(6));
                             sendBtn.setOnClickListener(v -> {
                                 if (hidDeviceProxy == null || hidConnectedDevice == null) {
                                     triggerErrorBeep();
@@ -499,8 +501,8 @@ public class MainActivity extends ComponentActivity {
                                 }
                             });
 
-                            LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36));
-                            btnParams.setMargins(dp(8), 0, 0, 0);
+                            LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(dp(44), dp(36));
+                            btnParams.setMargins(dp(12), 0, 0, 0);
 
                             btnRow.addView(copyBtn, btnParams);
                             btnRow.addView(sendBtn, btnParams);
