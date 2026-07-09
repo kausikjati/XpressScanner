@@ -110,6 +110,9 @@ public class MainActivity extends ComponentActivity {
     private BluetoothDevice hidConnectedDevice;
     private boolean isAppRegistered = false;
 
+    // Concurrency Lock to prevent overlapping data sends
+    private volatile boolean isTyping = false;
+
     private ToneGenerator toneGenerator;
     private SharedPreferences prefs;
 
@@ -626,6 +629,10 @@ public class MainActivity extends ComponentActivity {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.CAMERA);
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+        }
         if (permissions.isEmpty()) {
             startCamera();
             setupHidProfile();
@@ -686,8 +693,13 @@ public class MainActivity extends ComponentActivity {
     @SuppressLint("MissingPermission")
     private void registerHidApp() {
         BluetoothHidDeviceAppSdpSettings sdpSettings = new BluetoothHidDeviceAppSdpSettings(
-                "Xpress HID Scanner", "Android Bluetooth Scanner", "Xpress", (byte) 0x00, HID_KEYBOARD_DESCRIPTOR
+                "Xpress HID Scanner",
+                "Android Bluetooth Scanner",
+                "Xpress",
+                BluetoothHidDevice.SUBCLASS1_KEYBOARD,
+                HID_KEYBOARD_DESCRIPTOR
         );
+
         hidDeviceProxy.registerApp(sdpSettings, null, null, ContextCompat.getMainExecutor(this), new BluetoothHidDevice.Callback() {
             @Override
             public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
@@ -813,6 +825,8 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void handleScan(String value) {
+        if (isTyping) return; // Prevent overlapping hardware scans
+
         long now = System.currentTimeMillis();
         if (value.equals(lastSent) && now - lastSentAt < 1800) return;
         lastSent = value;
@@ -865,17 +879,22 @@ public class MainActivity extends ComponentActivity {
     @SuppressLint("MissingPermission")
     private void sendValue(String value) {
         if (hidDeviceProxy == null || hidConnectedDevice == null) return;
+
+        isTyping = true; // Lock thread to block rapid new barcode readings
         new Thread(() -> {
             try {
                 for (char c : (value + "\n").toCharArray()) {
                     byte[] report = charToHidReport(c);
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 1, report);
+                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
                     Thread.sleep(12);
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 1, new byte[8]);
+                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
                     Thread.sleep(12);
                 }
             } catch (Exception ex) {
                 updateStatusUI("❌ Pipeline Error", "btnDisconnect");
+            } finally {
+                try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+                isTyping = false; // Unlock
             }
         }).start();
     }
