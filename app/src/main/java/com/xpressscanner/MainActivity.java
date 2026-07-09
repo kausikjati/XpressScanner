@@ -110,6 +110,9 @@ public class MainActivity extends ComponentActivity {
     private BluetoothDevice hidConnectedDevice;
     private boolean isAppRegistered = false;
 
+    // Concurrency Lock to prevent overlapping data sends
+    private volatile boolean isTyping = false;
+
     private ToneGenerator toneGenerator;
     private SharedPreferences prefs;
 
@@ -437,6 +440,7 @@ public class MainActivity extends ComponentActivity {
         lastScanText.setTextColor(color("accentGreen"));
         lastScanText.setTextSize(14);
         lastScanText.setTypeface(android.graphics.Typeface.MONOSPACE);
+        lastScanText.setPadding(dp(12), 0, 0, 0);
         historyRow.addView(lastScanText);
 
         root.addView(historyRow);
@@ -584,6 +588,10 @@ public class MainActivity extends ComponentActivity {
                             sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 8));
                             sendBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
                             sendBtn.setOnClickListener(v -> {
+                                if (isTyping) {
+                                    toast("Please wait, currently sending data...");
+                                    return;
+                                }
                                 if (hidDeviceProxy == null || hidConnectedDevice == null) {
                                     triggerErrorBeep();
                                     toast("Transmission failed: Not connected.");
@@ -706,7 +714,7 @@ public class MainActivity extends ComponentActivity {
                 if (device.getAddress().equals(savedMac)) {
                     selectedDevice = device;
                     String name = device.getName() == null ? "Unknown Machine" : device.getName();
-                    runOnUiThread(() -> deviceButton.setText(name));
+                    runOnUiThread(() -> deviceButton.setText("  " + name));
                     break;
                 }
             }
@@ -748,6 +756,10 @@ public class MainActivity extends ComponentActivity {
         ArrayList<String> permissions = new ArrayList<>();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             permissions.add(Manifest.permission.CAMERA);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
         }
         if (permissions.isEmpty()) {
             startCamera();
@@ -855,7 +867,7 @@ public class MainActivity extends ComponentActivity {
                     selectedDevice = pairedDevices.get(which);
                     prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
                     String name = selectedDevice.getName() == null ? "Unknown Machine" : selectedDevice.getName();
-                    deviceButton.setText(name);
+                    deviceButton.setText("  " + name);
                 }).show();
     }
 
@@ -936,6 +948,8 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void handleScan(String value) {
+        if (isTyping) return; // FIX: Prevent concurrent overlapping hardware scans[cite: 6]
+
         long now = System.currentTimeMillis();
         if (value.equals(lastSent) && now - lastSentAt < 1800) return;
         lastSent = value;
@@ -956,6 +970,11 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void sendManualValue() {
+        if (isTyping) { // FIX: Prevent concurrent overlapping manual sends[cite: 6]
+            toast("Please wait, currently sending data...");
+            return;
+        }
+
         String value = manualInput.getText().toString().trim();
         if (value.isEmpty()) return;
 
@@ -988,6 +1007,8 @@ public class MainActivity extends ComponentActivity {
     @SuppressLint("MissingPermission")
     private void sendValue(String value) {
         if (hidDeviceProxy == null || hidConnectedDevice == null) return;
+
+        isTyping = true; // FIX: Lock thread[cite: 6]
         new Thread(() -> {
             try {
                 for (char c : (value + "\n").toCharArray()) {
@@ -999,6 +1020,9 @@ public class MainActivity extends ComponentActivity {
                 }
             } catch (Exception ex) {
                 updateStatusUI("Pipeline Error", "btnDisconnect");
+            } finally {
+                try { Thread.sleep(250); } catch (InterruptedException ignored) {}
+                isTyping = false; // FIX: Unlock thread to allow next scan[cite: 6]
             }
         }).start();
     }
@@ -1070,7 +1094,7 @@ public class MainActivity extends ComponentActivity {
             bracketPaint.setAntiAlias(true);
 
             boxPaint = new Paint();
-            boxPaint.setColor(color("accentGreen")); // Scan target box, matches accent palette
+            boxPaint.setColor(color("accentGreen")); // Scan target box
             boxPaint.setStyle(Paint.Style.STROKE);
             boxPaint.setStrokeWidth(8f);
             boxPaint.setAntiAlias(true);
