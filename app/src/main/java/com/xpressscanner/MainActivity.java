@@ -34,7 +34,6 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -256,7 +255,7 @@ public class MainActivity extends ComponentActivity {
         ImageButton infoButton = new ImageButton(this);
         infoButton.setImageResource(R.drawable.ic_info);
         infoButton.setBackground(createCardDrawable(Color.WHITE, 0, 18));
-        infoButton.setPadding(dp(7), dp(7), dp(7), dp(7));
+        infoButton.setPadding(dp(9), dp(9), dp(9), dp(9));
         infoButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
         infoButton.setElevation(dp(2));
         infoButton.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
@@ -370,11 +369,13 @@ public class MainActivity extends ComponentActivity {
         scannerLabel.setLayoutParams(scannerLabelParams);
         root.addView(scannerLabel);
 
-        // Viewport / Camera Frame
+        // Viewport / Camera Frame — flexible height so the whole screen (including
+        // manual entry below) always fits without scrolling, on any screen size.
         FrameLayout cameraContainer = new FrameLayout(this);
-        LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(320));
+        LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         cameraContainerParams.setMargins(0, 0, 0, dp(16));
         cameraContainer.setLayoutParams(cameraContainerParams);
+        cameraContainer.setMinimumHeight(dp(160));
 
         cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("cardStroke"), 20));
         cameraContainer.setClipToOutline(true);
@@ -391,7 +392,7 @@ public class MainActivity extends ComponentActivity {
         ImageButton flashButton = new ImageButton(this);
         flashButton.setImageResource(R.drawable.ic_flash_off);
         flashButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        flashButton.setPadding(dp(10), dp(10), dp(10), dp(10));
+        flashButton.setPadding(dp(12), dp(12), dp(12), dp(12));
         flashButton.setBackground(createCardDrawable(color("overlay"), 0, 24));
         FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(dp(46), dp(46));
         flashParams.gravity = Gravity.BOTTOM | Gravity.END;
@@ -450,8 +451,9 @@ public class MainActivity extends ComponentActivity {
         ImageButton historyBtn = new ImageButton(this);
         historyBtn.setImageResource(R.drawable.ic_history);
         historyBtn.setColorFilter(color("textSub"));
+        historyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
         historyBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
-        historyBtn.setPadding(dp(8), dp(8), dp(8), dp(8));
+        historyBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
         LinearLayout.LayoutParams historyBtnParams = new LinearLayout.LayoutParams(dp(40), dp(40));
         historyBtnParams.setMargins(0, 0, dp(10), 0);
         historyBtn.setLayoutParams(historyBtnParams);
@@ -466,10 +468,6 @@ public class MainActivity extends ComponentActivity {
         historyRow.addView(lastScanText);
 
         root.addView(historyRow);
-
-        // Flexible Spacer
-        Space spacer = new Space(this);
-        root.addView(spacer, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         LinearLayout.LayoutParams manualLabelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         manualLabelParams.setMargins(dp(2), dp(8), 0, dp(8));
@@ -511,7 +509,7 @@ public class MainActivity extends ComponentActivity {
         sendButton.setImageResource(R.drawable.ic_send);
         sendButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
         sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 10));
-        sendButton.setPadding(dp(13), dp(10), dp(13), dp(10));
+        sendButton.setPadding(dp(14), dp(12), dp(14), dp(12));
         sendButton.setOnClickListener(v -> sendManualValue());
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -599,7 +597,7 @@ public class MainActivity extends ComponentActivity {
                             copyBtn.setImageResource(R.drawable.ic_copy);
                             copyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
                             copyBtn.setBackground(createCardDrawable(color("btnRefresh"), 0, 8));
-                            copyBtn.setPadding(dp(10), dp(6), dp(10), dp(6));
+                            copyBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
                             copyBtn.setOnClickListener(v -> {
                                 android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                                 android.content.ClipData clip = android.content.ClipData.newPlainText("Barcode", scannedData);
@@ -612,7 +610,7 @@ public class MainActivity extends ComponentActivity {
                             sendBtn.setImageResource(R.drawable.ic_send);
                             sendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
                             sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 8));
-                            sendBtn.setPadding(dp(10), dp(6), dp(10), dp(6));
+                            sendBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
                             sendBtn.setOnClickListener(v -> {
                                 if (hidDeviceProxy == null || hidConnectedDevice == null) {
                                     triggerErrorBeep();
