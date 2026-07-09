@@ -196,7 +196,54 @@ public class MainActivity extends ComponentActivity {
             return WindowInsetsCompat.CONSUMED;
         });
 
-        // Top Header Row
+        // Brand Row (logo + app name)
+        LinearLayout brandRow = new LinearLayout(this);
+        brandRow.setOrientation(LinearLayout.HORIZONTAL);
+        brandRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        brandParams.setMargins(0, 0, 0, dp(14));
+        brandRow.setLayoutParams(brandParams);
+
+        ImageView logoView = new ImageView(this);
+        logoView.setImageResource(R.drawable.ic_scan_logo);
+        logoView.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
+        logoView.setPadding(dp(6), dp(6), dp(6), dp(6));
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(36), dp(36));
+        logoParams.setMargins(0, 0, dp(10), 0);
+        brandRow.addView(logoView, logoParams);
+
+        LinearLayout titleBlock = new LinearLayout(this);
+        titleBlock.setOrientation(LinearLayout.VERTICAL);
+        titleBlock.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView appTitle = new TextView(this);
+        appTitle.setText("Xpress Scanner");
+        appTitle.setTextSize(17);
+        appTitle.setTextColor(color("textMain"));
+        appTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        titleBlock.addView(appTitle);
+
+        TextView appSubtitle = new TextView(this);
+        appSubtitle.setText("Bluetooth barcode wedge");
+        appSubtitle.setTextSize(12);
+        appSubtitle.setTextColor(color("textSub"));
+        titleBlock.addView(appSubtitle);
+        brandRow.addView(titleBlock);
+
+        // Info Button
+        ImageButton infoButton = new ImageButton(this);
+        infoButton.setImageResource(R.drawable.ic_info);
+        infoButton.setBackground(createCardDrawable(Color.WHITE, 0, 18));
+        infoButton.setPadding(dp(7), dp(7), dp(7), dp(7));
+        infoButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        infoButton.setElevation(dp(2));
+        infoButton.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+        infoButton.setOnClickListener(v -> showInstructionsDialog());
+        brandRow.addView(infoButton);
+
+        root.addView(brandRow);
+
+        // Status Pill Row
         LinearLayout headerRow = new LinearLayout(this);
         headerRow.setOrientation(LinearLayout.HORIZONTAL);
         headerRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -209,12 +256,11 @@ public class MainActivity extends ComponentActivity {
         statusCard.setGravity(Gravity.CENTER);
         statusCard.setBackground(createCardDrawable(color("pillDefault"), 0, 24));
         statusCard.setPadding(dp(16), dp(10), dp(16), dp(10));
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        cardParams.setMargins(0, 0, dp(12), 0);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         statusCard.setLayoutParams(cardParams);
 
         statusText = new TextView(this);
-        statusText.setText("🔌 Initializing system...");
+        statusText.setText("Initializing system...");
         statusText.setTextSize(14);
         statusText.setTextColor(color("textMain"));
         statusText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
@@ -222,31 +268,25 @@ public class MainActivity extends ComponentActivity {
         statusCard.addView(statusText);
         headerRow.addView(statusCard);
 
-        // Info Button
-        ImageButton infoButton = new ImageButton(this);
-        infoButton.setImageResource(android.R.drawable.ic_dialog_info);
-        infoButton.setBackground(createCardDrawable(Color.WHITE, 0, 15));
-        infoButton.setColorFilter(Color.BLACK);
-        infoButton.setPadding(dp(6), dp(6), dp(6), dp(6));
-        infoButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        infoButton.setLayoutParams(new LinearLayout.LayoutParams(dp(30), dp(30)));
-        infoButton.setOnClickListener(v -> showInstructionsDialog());
-        headerRow.addView(infoButton);
-
         root.addView(headerRow);
 
         // Bluetooth Panel
         LinearLayout btPanel = new LinearLayout(this);
         btPanel.setOrientation(LinearLayout.VERTICAL);
-        btPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 12));
+        btPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 14));
         btPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
+        btPanel.setElevation(dp(1));
 
         deviceButton = new Button(this);
-        deviceButton.setText("Select Bluetooth Device");
+        deviceButton.setText("  Select Bluetooth Device");
         deviceButton.setAllCaps(false);
         deviceButton.setTextSize(15);
         deviceButton.setTextColor(color("textMain"));
-        deviceButton.setBackground(createCardDrawable(color("bg"), color("cardStroke"), 8));
+        deviceButton.setBackground(createCardDrawable(color("bg"), color("cardStroke"), 10));
+        deviceButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_bluetooth, 0, 0, 0);
+        deviceButton.setCompoundDrawablePadding(dp(8));
+        deviceButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        deviceButton.setPaddingRelative(dp(14), 0, dp(14), 0);
         deviceButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
@@ -259,27 +299,31 @@ public class MainActivity extends ComponentActivity {
         actionRow.setLayoutParams(rowParams);
 
         Button refreshButton = new Button(this);
-        refreshButton.setText("🔄 Refresh");
+        refreshButton.setText(" Refresh");
         refreshButton.setAllCaps(false);
         refreshButton.setTextColor(color("textMain"));
-        refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 0, 8));
+        refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 0, 10));
+        refreshButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_refresh, 0, 0, 0);
+        refreshButton.setCompoundDrawablePadding(dp(6));
         refreshButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
 
         connectButton = new Button(this);
-        connectButton.setText("Connect");
+        connectButton.setText(" Connect");
         connectButton.setAllCaps(false);
         connectButton.setTextColor(Color.WHITE);
         connectButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 8));
+        connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
+        connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
+        connectButton.setCompoundDrawablePadding(dp(6));
         connectButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) toggleConnection();
         });
 
-        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(0, dp(44), 1);
+        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(0, dp(46), 1);
         p1.setMargins(0, 0, dp(8), 0);
-        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(0, dp(44), 1);
+        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(0, dp(46), 1);
         p2.setMargins(dp(8), 0, 0, 0);
 
         actionRow.addView(refreshButton, p1);
@@ -293,8 +337,9 @@ public class MainActivity extends ComponentActivity {
         cameraContainerParams.setMargins(0, dp(16), 0, dp(16));
         cameraContainer.setLayoutParams(cameraContainerParams);
 
-        cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("pillConnected"), 16));
+        cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("pillConnected"), 20));
         cameraContainer.setClipToOutline(true);
+        cameraContainer.setElevation(dp(2));
 
         previewView = new PreviewView(this);
         previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
@@ -304,20 +349,21 @@ public class MainActivity extends ComponentActivity {
         cameraContainer.addView(barcodeOverlayView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         // Floating Flash Toggle
-        Button flashButton = new Button(this);
-        flashButton.setText("⚡");
-        flashButton.setTextSize(18);
-        flashButton.setTextColor(Color.parseColor("#FBBF24")); // Yellow bolt
-        flashButton.setBackground(createCardDrawable(Color.parseColor("#88000000"), 0, 24));
-        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(dp(44), dp(44));
+        ImageButton flashButton = new ImageButton(this);
+        flashButton.setImageResource(R.drawable.ic_flash_off);
+        flashButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        flashButton.setPadding(dp(10), dp(10), dp(10), dp(10));
+        flashButton.setBackground(createCardDrawable(Color.parseColor("#99000000"), 0, 24));
+        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(dp(46), dp(46));
         flashParams.gravity = Gravity.BOTTOM | Gravity.END;
-        flashParams.setMargins(0, 0, dp(12), dp(12));
+        flashParams.setMargins(0, 0, dp(14), dp(14));
         flashButton.setLayoutParams(flashParams);
         flashButton.setOnClickListener(v -> {
             if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
                 isFlashOn = !isFlashOn;
                 camera.getCameraControl().enableTorch(isFlashOn);
-                flashButton.setBackground(createCardDrawable(Color.parseColor(isFlashOn ? "#AA1D4ED8" : "#88000000"), 0, 24));
+                flashButton.setImageResource(isFlashOn ? R.drawable.ic_flash : R.drawable.ic_flash_off);
+                flashButton.setBackground(createCardDrawable(Color.parseColor(isFlashOn ? "#CC1D4ED8" : "#99000000"), 0, 24));
             } else {
                 toast("Flash not supported.");
             }
@@ -332,11 +378,14 @@ public class MainActivity extends ComponentActivity {
         historyRow.setGravity(Gravity.CENTER_VERTICAL);
         historyRow.setPadding(dp(8), 0, dp(8), 0);
 
-        Button historyBtn = new Button(this);
-        historyBtn.setText("🕒");
-        historyBtn.setBackground(null);
-        historyBtn.setTextSize(16);
-        historyBtn.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(40)));
+        ImageButton historyBtn = new ImageButton(this);
+        historyBtn.setImageResource(R.drawable.ic_history);
+        historyBtn.setColorFilter(color("textSub"));
+        historyBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
+        historyBtn.setPadding(dp(8), dp(8), dp(8), dp(8));
+        LinearLayout.LayoutParams historyBtnParams = new LinearLayout.LayoutParams(dp(40), dp(40));
+        historyBtnParams.setMargins(0, 0, dp(10), 0);
+        historyBtn.setLayoutParams(historyBtnParams);
         historyBtn.setOnClickListener(v -> showHistoryDialog());
         historyRow.addView(historyBtn);
 
@@ -356,8 +405,9 @@ public class MainActivity extends ComponentActivity {
         // Manual Intervention Console
         LinearLayout manualPanel = new LinearLayout(this);
         manualPanel.setOrientation(LinearLayout.VERTICAL);
-        manualPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 12));
+        manualPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 14));
         manualPanel.setPadding(dp(12), dp(12), dp(12), dp(12));
+        manualPanel.setElevation(dp(1));
         LinearLayout.LayoutParams manualParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         manualParams.setMargins(0, dp(8), 0, 0);
         manualPanel.setLayoutParams(manualParams);
@@ -367,13 +417,13 @@ public class MainActivity extends ComponentActivity {
 
         manualInput = new EditText(this);
         manualInput.setSingleLine(true);
-        manualInput.setHint("Input value manually... ✏️");
+        manualInput.setHint("Enter value manually");
         manualInput.setHintTextColor(color("textSub"));
         manualInput.setTextColor(color("textMain"));
         manualInput.setTextSize(15);
         manualInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
 
-        manualInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 8));
+        manualInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 10));
         manualInput.setPadding(dp(12), dp(10), dp(12), dp(10));
 
         manualInput.setOnEditorActionListener((v, actionId, event) -> {
@@ -386,10 +436,10 @@ public class MainActivity extends ComponentActivity {
 
         // Icon Based Manual Send Button
         ImageButton sendButton = new ImageButton(this);
-        sendButton.setImageResource(android.R.drawable.ic_menu_send);
-        sendButton.setColorFilter(Color.WHITE);
-        sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 8));
-        sendButton.setPadding(dp(12), dp(8), dp(12), dp(8));
+        sendButton.setImageResource(R.drawable.ic_send);
+        sendButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 10));
+        sendButton.setPadding(dp(13), dp(10), dp(13), dp(10));
         sendButton.setOnClickListener(v -> sendManualValue());
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -474,9 +524,9 @@ public class MainActivity extends ComponentActivity {
 
                             // Copy Button (Icon Only)
                             ImageButton copyBtn = new ImageButton(this);
-                            copyBtn.setImageResource(android.R.drawable.ic_menu_agenda); // Native clipboard-like icon
-                            copyBtn.setColorFilter(color("textMain"));
-                            copyBtn.setBackground(createCardDrawable(color("btnRefresh"), 0, 6));
+                            copyBtn.setImageResource(R.drawable.ic_copy);
+                            copyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                            copyBtn.setBackground(createCardDrawable(color("btnRefresh"), 0, 8));
                             copyBtn.setPadding(dp(10), dp(6), dp(10), dp(6));
                             copyBtn.setOnClickListener(v -> {
                                 android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
@@ -487,9 +537,9 @@ public class MainActivity extends ComponentActivity {
 
                             // Send Button (Icon Only)
                             ImageButton sendBtn = new ImageButton(this);
-                            sendBtn.setImageResource(android.R.drawable.ic_menu_send); // Native paper plane icon
-                            sendBtn.setColorFilter(Color.WHITE);
-                            sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 6));
+                            sendBtn.setImageResource(R.drawable.ic_send);
+                            sendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                            sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 8));
                             sendBtn.setPadding(dp(10), dp(6), dp(10), dp(6));
                             sendBtn.setOnClickListener(v -> {
                                 if (hidDeviceProxy == null || hidConnectedDevice == null) {
@@ -519,12 +569,24 @@ public class MainActivity extends ComponentActivity {
         }
 
         if (!hasData) {
+            LinearLayout emptyState = new LinearLayout(this);
+            emptyState.setOrientation(LinearLayout.VERTICAL);
+            emptyState.setGravity(Gravity.CENTER);
+            emptyState.setPadding(0, dp(32), 0, dp(32));
+
+            ImageView emptyIcon = new ImageView(this);
+            emptyIcon.setImageResource(R.drawable.ic_empty_history);
+            LinearLayout.LayoutParams emptyIconParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+            emptyIconParams.setMargins(0, 0, 0, dp(10));
+            emptyState.addView(emptyIcon, emptyIconParams);
+
             TextView empty = new TextView(this);
             empty.setText("No scans in the last 48 hours.");
             empty.setTextColor(color("textSub"));
             empty.setGravity(Gravity.CENTER);
-            empty.setPadding(0, dp(32), 0, dp(32));
-            listLayout.addView(empty);
+            emptyState.addView(empty);
+
+            listLayout.addView(emptyState);
         }
 
         scrollView.addView(listLayout);
@@ -550,7 +612,7 @@ public class MainActivity extends ComponentActivity {
         String instructions = "1. Pair your Devices\n" +
                 "Open your phone's Android Settings > Bluetooth, and pair your phone with your Mac/PC.\n\n" +
                 "2. Start the Framework\n" +
-                "Wait for the top banner to say \"✅ Scanner ready\".\n\n" +
+                "Wait for the top banner to say \"Scanner ready\".\n\n" +
                 "3. Connect to Computer\n" +
                 "Tap \"Select Bluetooth Device\" and choose your computer. Tap \"Connect\".\n\n" +
                 "4. Scan Barcodes\n" +
@@ -603,19 +665,21 @@ public class MainActivity extends ComponentActivity {
             if (!connected.isEmpty()) {
                 hidConnectedDevice = connected.get(0);
                 String name = hidConnectedDevice.getName() == null ? "Unknown Host" : hidConnectedDevice.getName();
-                updateStatusUI("🔗 Connected to: " + name, "pillConnected");
+                updateStatusUI("Connected to " + name, "pillConnected");
                 runOnUiThread(() -> {
-                    connectButton.setBackground(createCardDrawable(color("btnDisconnect"), 0, 8));
-                    connectButton.setText("❌ Disconnect");
+                    connectButton.setBackground(createCardDrawable(color("btnDisconnect"), 0, 10));
+                    connectButton.setText(" Disconnect");
+                    connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link_off, 0, 0, 0);
                 });
             } else {
                 hidConnectedDevice = null;
                 if (isAppRegistered) {
-                    updateStatusUI("✅ Scanner ready. Select target.", "pillDefault");
+                    updateStatusUI("Scanner ready. Select target.", "pillDefault");
                 }
                 runOnUiThread(() -> {
-                    connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 8));
-                    connectButton.setText("Connect");
+                    connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
+                    connectButton.setText(" Connect");
+                    connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
                 });
             }
         }
@@ -641,7 +705,7 @@ public class MainActivity extends ComponentActivity {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                 startCamera();
             } else {
-                updateStatusUI("❌ Camera denied. Scanning disabled.", "btnDisconnect");
+                updateStatusUI("Camera denied. Scanning disabled.", "btnDisconnect");
             }
             if (hasBluetoothPermission()) {
                 setupHidProfile();
@@ -695,7 +759,7 @@ public class MainActivity extends ComponentActivity {
                 if (registered) {
                     syncConnectionState();
                 } else {
-                    updateStatusUI("❌ Scanner unregistered.", "btnDisconnect");
+                    updateStatusUI("Scanner unregistered.", "btnDisconnect");
                 }
             }
 
@@ -750,7 +814,7 @@ public class MainActivity extends ComponentActivity {
         }
 
         if (hidConnectedDevice != null) {
-            updateStatusUI("⏳ Disconnecting...", "pillDefault");
+            updateStatusUI("Disconnecting...", "pillDefault");
             hidDeviceProxy.disconnect(hidConnectedDevice);
         } else {
             if (selectedDevice == null) {
@@ -759,7 +823,7 @@ public class MainActivity extends ComponentActivity {
             }
             prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
 
-            updateStatusUI("⏳ Connecting HID Framework...", "pillDefault");
+            updateStatusUI("Connecting HID Framework...", "pillDefault");
             hidDeviceProxy.connect(selectedDevice);
         }
     }
@@ -779,7 +843,7 @@ public class MainActivity extends ComponentActivity {
 
                 camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
             } catch (ExecutionException | InterruptedException | RuntimeException ex) {
-                updateStatusUI("❌ Camera Init Failed", "btnDisconnect");
+                updateStatusUI("Camera Init Failed", "btnDisconnect");
             }
         }, ContextCompat.getMainExecutor(this));
     }
@@ -875,7 +939,7 @@ public class MainActivity extends ComponentActivity {
                     Thread.sleep(12);
                 }
             } catch (Exception ex) {
-                updateStatusUI("❌ Pipeline Error", "btnDisconnect");
+                updateStatusUI("Pipeline Error", "btnDisconnect");
             }
         }).start();
     }
