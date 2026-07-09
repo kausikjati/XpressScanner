@@ -17,8 +17,8 @@
             android:endX="512"
             android:endY="512"
             android:type="linear">
-          <item android:offset="0" android:color="#FF1E293B"/>
-          <item android:offset="1" android:color="#FF0F172A"/>
+          <item android:offset="0" android:color="#FF1C2438"/>
+          <item android:offset="1" android:color="#FF0B0F1A"/>
         </gradient>
       </aapt:attr>
     </path>
@@ -27,28 +27,28 @@
         android:strokeLineJoin="round"
         android:strokeWidth="24"
         android:fillColor="#00000000"
-        android:strokeColor="#10B981"
+        android:strokeColor="#2DD4BF"
         android:strokeLineCap="round"/>
     <path
         android:pathData="M384,192L384,128L320,128"
         android:strokeLineJoin="round"
         android:strokeWidth="24"
         android:fillColor="#00000000"
-        android:strokeColor="#10B981"
+        android:strokeColor="#2DD4BF"
         android:strokeLineCap="round"/>
     <path
         android:pathData="M128,320L128,384L192,384"
         android:strokeLineJoin="round"
         android:strokeWidth="24"
         android:fillColor="#00000000"
-        android:strokeColor="#10B981"
+        android:strokeColor="#2DD4BF"
         android:strokeLineCap="round"/>
     <path
         android:pathData="M384,320L384,384L320,384"
         android:strokeLineJoin="round"
         android:strokeWidth="24"
         android:fillColor="#00000000"
-        android:strokeColor="#10B981"
+        android:strokeColor="#2DD4BF"
         android:strokeLineCap="round"/>
     <path
         android:pathData="M172,164L180,164A8,8 0,0 1,188 172L188,340A8,8 0,0 1,180 348L172,348A8,8 0,0 1,164 340L164,172A8,8 0,0 1,172 164z"
@@ -67,13 +67,13 @@
         android:fillColor="#F8FAFC"/>
     <path
         android:pathData="M108,248L404,248A8,8 0,0 1,412 256L412,256A8,8 0,0 1,404 264L108,264A8,8 0,0 1,100 256L100,256A8,8 0,0 1,108 248z"
-        android:fillColor="#10B981"/>
+        android:fillColor="#2DD4BF"/>
     <path
         android:pathData="M104,252L408,252A4,4 0,0 1,412 256L412,256A4,4 0,0 1,408 260L104,260A4,4 0,0 1,100 256L100,256A4,4 0,0 1,104 252z"
         android:fillColor="#A7F3D0"/>
     <path
         android:pathData="M396,396m-56,0a56,56 0,1 1,112 0a56,56 0,1 1,-112 0"
-        android:fillColor="#4F46E5"/>
+        android:fillColor="#4338CA"/>
     <path
         android:pathData="M396,364L416,384L396,404L416,424L396,444L396,364M396,404L376,384M396,404L376,424"
         android:strokeLineJoin="round"
