@@ -222,7 +222,7 @@ public class MainActivity extends ComponentActivity {
         brandRow.setOrientation(LinearLayout.HORIZONTAL);
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        brandParams.setMargins(0, 0, 0, dp(14));
+        brandParams.setMargins(0, 0, 0, dp(10));
         brandRow.setLayoutParams(brandParams);
 
         ImageView logoView = new ImageView(this);
@@ -269,7 +269,7 @@ public class MainActivity extends ComponentActivity {
         headerRow.setOrientation(LinearLayout.HORIZONTAL);
         headerRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        headerParams.setMargins(0, 0, 0, dp(16));
+        headerParams.setMargins(0, 0, 0, dp(12));
         headerRow.setLayoutParams(headerParams);
 
         statusCard = new LinearLayout(this);
@@ -336,7 +336,8 @@ public class MainActivity extends ComponentActivity {
         refreshButton.setTextColor(color("textMain"));
         refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 0, 10));
         refreshButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_refresh, 0, 0, 0);
-        refreshButton.setCompoundDrawablePadding(dp(6));
+        refreshButton.setCompoundDrawablePadding(dp(8));
+        refreshButton.setPaddingRelative(dp(14), 0, dp(14), 0);
         refreshButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
@@ -348,7 +349,8 @@ public class MainActivity extends ComponentActivity {
         connectButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
         connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
-        connectButton.setCompoundDrawablePadding(dp(6));
+        connectButton.setCompoundDrawablePadding(dp(8));
+        connectButton.setPaddingRelative(dp(14), 0, dp(14), 0);
         connectButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) toggleConnection();
         });
@@ -364,7 +366,7 @@ public class MainActivity extends ComponentActivity {
         root.addView(btPanel);
 
         LinearLayout.LayoutParams scannerLabelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        scannerLabelParams.setMargins(dp(2), dp(18), 0, dp(8));
+        scannerLabelParams.setMargins(dp(2), dp(14), 0, dp(8));
         TextView scannerLabel = sectionLabel("SCANNER");
         scannerLabel.setLayoutParams(scannerLabelParams);
         root.addView(scannerLabel);
@@ -375,7 +377,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         cameraContainerParams.setMargins(0, 0, 0, dp(16));
         cameraContainer.setLayoutParams(cameraContainerParams);
-        cameraContainer.setMinimumHeight(dp(160));
+        cameraContainer.setMinimumHeight(dp(220));
 
         cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("cardStroke"), 20));
         cameraContainer.setClipToOutline(true);
@@ -409,36 +411,6 @@ public class MainActivity extends ComponentActivity {
             }
         });
         cameraContainer.addView(flashButton);
-
-        // LIVE badge
-        LinearLayout liveBadge = new LinearLayout(this);
-        liveBadge.setOrientation(LinearLayout.HORIZONTAL);
-        liveBadge.setGravity(Gravity.CENTER_VERTICAL);
-        liveBadge.setBackground(createCardDrawable(color("overlay"), 0, 16));
-        liveBadge.setPadding(dp(10), dp(5), dp(10), dp(5));
-        FrameLayout.LayoutParams liveParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        liveParams.gravity = Gravity.TOP | Gravity.START;
-        liveParams.setMargins(dp(14), dp(14), 0, 0);
-        liveBadge.setLayoutParams(liveParams);
-
-        View liveDot = new View(this);
-        GradientDrawable dotShape = new GradientDrawable();
-        dotShape.setShape(GradientDrawable.OVAL);
-        dotShape.setColor(color("accentGreen"));
-        liveDot.setBackground(dotShape);
-        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(7), dp(7));
-        dotParams.setMargins(0, 0, dp(6), 0);
-        liveBadge.addView(liveDot, dotParams);
-
-        TextView liveText = new TextView(this);
-        liveText.setText("LIVE");
-        liveText.setTextSize(11);
-        liveText.setTextColor(Color.WHITE);
-        liveText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        liveText.setLetterSpacing(0.08f);
-        liveBadge.addView(liveText);
-
-        cameraContainer.addView(liveBadge);
 
         root.addView(cameraContainer);
 
@@ -753,6 +725,8 @@ public class MainActivity extends ComponentActivity {
                     connectButton.setBackground(createCardDrawable(color("btnDisconnect"), 0, 10));
                     connectButton.setText(" Disconnect");
                     connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link_off, 0, 0, 0);
+                    connectButton.setCompoundDrawablePadding(dp(8));
+                    connectButton.setPaddingRelative(dp(14), 0, dp(14), 0);
                 });
             } else {
                 hidConnectedDevice = null;
@@ -763,6 +737,8 @@ public class MainActivity extends ComponentActivity {
                     connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
                     connectButton.setText(" Connect");
                     connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
+                    connectButton.setCompoundDrawablePadding(dp(8));
+                    connectButton.setPaddingRelative(dp(14), 0, dp(14), 0);
                 });
             }
         }
