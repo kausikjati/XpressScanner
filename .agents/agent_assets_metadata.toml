@@ -1,0 +1,26 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "n9rM5BfeOjT6PFnwkjrvM"
+uri = "file://attached_assets/playstore_screens/screen_1_scan.png"
+type = "image"
+title = "Play Store Screenshot 1 - Scan Anywhere, Instantly"
+
+[[outputs]]
+id = "Et9GCwobuwivvvcF-MSag"
+uri = "file://attached_assets/playstore_screens/screen_2_connected.png"
+type = "image"
+title = "Play Store Screenshot 2 - Seamless Bluetooth Pairing"
+
+[[outputs]]
+id = "ltNnK9dNOV4F943HoFNnj"
+uri = "file://attached_assets/playstore_screens/screen_3_ready.png"
+type = "image"
+title = "Play Store Screenshot 3 - One Tap to Connect"
+
+[[outputs]]
+id = "5OoS4D70SkaNW6BJNWNwa"
+uri = "file://attached_assets/playstore_screens/screen_4_manual.png"
+type = "image"
+title = "Play Store Screenshot 4 - Manual Entry, Your Way"
