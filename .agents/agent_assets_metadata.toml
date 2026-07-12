@@ -30,3 +30,9 @@ id = "6ulIGcLHI7BZCzaayFGL-"
 uri = "file://attached_assets/playstore_screens/playstore_icon_512.png"
 type = "image"
 title = "Google Play Store App Icon (512x512 PNG)"
+
+[[outputs]]
+id = "qPy83T7GBTXVOaAeXbYbO"
+uri = "file://attached_assets/playstore_screens/feature_graphic_1024x500.png"
+type = "image"
+title = "Google Play Store Feature Graphic (1024x500)"
