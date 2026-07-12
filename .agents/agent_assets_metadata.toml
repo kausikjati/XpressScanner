@@ -24,3 +24,9 @@ id = "5OoS4D70SkaNW6BJNWNwa"
 uri = "file://attached_assets/playstore_screens/screen_4_manual.png"
 type = "image"
 title = "Play Store Screenshot 4 - Manual Entry, Your Way"
+
+[[outputs]]
+id = "6ulIGcLHI7BZCzaayFGL-"
+uri = "file://attached_assets/playstore_screens/playstore_icon_512.png"
+type = "image"
+title = "Google Play Store App Icon (512x512 PNG)"
