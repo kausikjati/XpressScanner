@@ -160,25 +160,43 @@ public class MainActivity extends ComponentActivity {
     private static int color(String key) {
         switch(key) {
             case "bg": return Color.parseColor("#0B0F1A");
+            case "bgTop": return Color.parseColor("#121A2E");
+            case "bgBottom": return Color.parseColor("#07090F");
             case "card": return Color.parseColor("#141B2E");
+            case "cardTop": return Color.parseColor("#1A2338");
+            case "cardBottom": return Color.parseColor("#121828");
             case "cardStroke": return Color.parseColor("#232C42");
+            case "cardStrokeSoft": return Color.parseColor("#2A3554");
             case "pillConnected": return Color.parseColor("#4338CA");
+            case "pillConnectedEnd": return Color.parseColor("#4F46E5");
             case "pillDefault": return Color.parseColor("#1C2438");
+            case "pillDefaultEnd": return Color.parseColor("#151C2E");
             case "textMain": return Color.parseColor("#F1F5F9");
             case "textSub": return Color.parseColor("#8B93A7");
             case "textLabel": return Color.parseColor("#5B6478");
             case "btnRefresh": return Color.parseColor("#2A3350");
-            case "btnDisconnect": return Color.parseColor("#DC2626");
-            case "btnConnect": return Color.parseColor("#15803D");
+            case "btnRefreshEnd": return Color.parseColor("#212841");
+            case "btnDisconnect": return Color.parseColor("#EF4444");
+            case "btnDisconnectEnd": return Color.parseColor("#DC2626");
+            case "btnConnect": return Color.parseColor("#22C55E");
+            case "btnConnectEnd": return Color.parseColor("#15803D");
             case "inputBg": return Color.parseColor("#0B0F1A");
-            case "btnSend": return Color.parseColor("#4F46E5");
+            case "btnSend": return Color.parseColor("#6366F1");
+            case "btnSendEnd": return Color.parseColor("#4338CA");
+            case "logoStart": return Color.parseColor("#2DD4BF");
+            case "logoEnd": return Color.parseColor("#4338CA");
             case "accentGreen": return Color.parseColor("#2DD4BF");
             case "accentIndigo": return Color.parseColor("#6366F1");
             case "accentRed": return Color.parseColor("#F87171");
             case "overlay": return Color.parseColor("#99000000");
             case "overlayActive": return Color.parseColor("#CC1D4ED8");
+            case "glassBorder": return Color.parseColor("#33FFFFFF");
             default: return Color.WHITE;
         }
+    }
+
+    private int withAlpha(int rgbColor, int alpha) {
+        return Color.argb(alpha, Color.red(rgbColor), Color.green(rgbColor), Color.blue(rgbColor));
     }
 
     private TextView sectionLabel(String text) {
@@ -187,9 +205,17 @@ public class MainActivity extends ComponentActivity {
         label.setTextSize(11);
         label.setTextColor(color("textLabel"));
         label.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        label.setLetterSpacing(0.08f);
+        label.setLetterSpacing(0.1f);
+
+        GradientDrawable accentDash = new GradientDrawable();
+        accentDash.setColor(color("accentGreen"));
+        accentDash.setCornerRadius(dp(2));
+        accentDash.setSize(dp(3), dp(11));
+        label.setCompoundDrawablesWithIntrinsicBounds(accentDash, null, null, null);
+        label.setCompoundDrawablePadding(dp(8));
+
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(dp(2), 0, 0, dp(8));
+        lp.setMargins(dp(2), 0, 0, dp(9));
         label.setLayoutParams(lp);
         return label;
     }
@@ -212,12 +238,12 @@ public class MainActivity extends ComponentActivity {
     private void buildLayout() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(color("bg"));
+        root.setBackground(createGradientDrawable(color("bgTop"), color("bgBottom"), 0, 0));
         root.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
 
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(dp(16) + insets.left, dp(20) + insets.top, dp(16) + insets.right, dp(20) + insets.bottom);
+            v.setPadding(dp(18) + insets.left, dp(20) + insets.top, dp(18) + insets.right, dp(20) + insets.bottom);
             return WindowInsetsCompat.CONSUMED;
         });
 
@@ -231,10 +257,11 @@ public class MainActivity extends ComponentActivity {
 
         ImageView logoView = new ImageView(this);
         logoView.setImageResource(R.drawable.ic_scan_logo);
-        logoView.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
-        logoView.setPadding(dp(6), dp(6), dp(6), dp(6));
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(36), dp(36));
-        logoParams.setMargins(0, 0, dp(10), 0);
+        logoView.setBackground(createGradientDrawable(color("logoStart"), color("logoEnd"), 0, 14));
+        logoView.setPadding(dp(7), dp(7), dp(7), dp(7));
+        logoView.setElevation(dp(2));
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(38), dp(38));
+        logoParams.setMargins(0, 0, dp(12), 0);
         brandRow.addView(logoView, logoParams);
 
         LinearLayout titleBlock = new LinearLayout(this);
@@ -279,18 +306,16 @@ public class MainActivity extends ComponentActivity {
         statusCard = new LinearLayout(this);
         statusCard.setOrientation(LinearLayout.HORIZONTAL);
         statusCard.setGravity(Gravity.CENTER);
-        statusCard.setBackground(createCardDrawable(color("pillDefault"), 0, 24));
-        statusCard.setPadding(dp(16), dp(10), dp(16), dp(10));
+        statusCard.setBackground(createGradientDrawable(color("pillDefault"), color("pillDefaultEnd"), color("cardStrokeSoft"), 26));
+        statusCard.setPadding(dp(16), dp(11), dp(16), dp(11));
+        statusCard.setElevation(dp(1));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         statusCard.setLayoutParams(cardParams);
 
         statusDot = new View(this);
-        GradientDrawable statusDotShape = new GradientDrawable();
-        statusDotShape.setShape(GradientDrawable.OVAL);
-        statusDotShape.setColor(color("textSub"));
-        statusDot.setBackground(statusDotShape);
-        LinearLayout.LayoutParams statusDotParams = new LinearLayout.LayoutParams(dp(8), dp(8));
-        statusDotParams.setMargins(0, 0, dp(8), 0);
+        statusDot.setBackground(createGlowDot(color("textSub")));
+        LinearLayout.LayoutParams statusDotParams = new LinearLayout.LayoutParams(dp(14), dp(14));
+        statusDotParams.setMargins(0, 0, dp(10), 0);
         statusCard.addView(statusDot, statusDotParams);
 
         statusText = new TextView(this);
@@ -309,16 +334,16 @@ public class MainActivity extends ComponentActivity {
         // Bluetooth Panel
         LinearLayout btPanel = new LinearLayout(this);
         btPanel.setOrientation(LinearLayout.VERTICAL);
-        btPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 14));
+        btPanel.setBackground(createGradientDrawable(color("cardTop"), color("cardBottom"), color("cardStrokeSoft"), 18));
         btPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
-        btPanel.setElevation(dp(1));
+        btPanel.setElevation(dp(2));
 
         deviceButton = new Button(this);
         deviceButton.setText("  Select Bluetooth Device");
         deviceButton.setAllCaps(false);
         deviceButton.setTextSize(15);
         deviceButton.setTextColor(color("textMain"));
-        deviceButton.setBackground(createCardDrawable(color("bg"), color("cardStroke"), 10));
+        deviceButton.setBackground(createCardDrawable(color("bg"), color("cardStrokeSoft"), 14));
         deviceButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_bluetooth, 0, 0, 0);
         deviceButton.setCompoundDrawablePadding(dp(8));
         deviceButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
@@ -338,10 +363,11 @@ public class MainActivity extends ComponentActivity {
         refreshButton.setText(" Refresh");
         refreshButton.setAllCaps(false);
         refreshButton.setTextColor(color("textMain"));
-        refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 0, 10));
+        refreshButton.setBackground(createGradientDrawable(color("btnRefresh"), color("btnRefreshEnd"), color("cardStrokeSoft"), 14));
         refreshButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_refresh, 0, 0, 0);
         refreshButton.setCompoundDrawablePadding(dp(8));
         refreshButton.setPaddingRelative(dp(14), 0, dp(14), 0);
+        refreshButton.setElevation(dp(1));
         refreshButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
@@ -351,10 +377,11 @@ public class MainActivity extends ComponentActivity {
         connectButton.setAllCaps(false);
         connectButton.setTextColor(Color.WHITE);
         connectButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
+        connectButton.setBackground(createGradientDrawable(color("btnConnect"), color("btnConnectEnd"), 0, 14));
         connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
         connectButton.setCompoundDrawablePadding(dp(8));
         connectButton.setPaddingRelative(dp(14), 0, dp(14), 0);
+        connectButton.setElevation(dp(2));
         connectButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) toggleConnection();
         });
@@ -382,9 +409,9 @@ public class MainActivity extends ComponentActivity {
         cameraContainer.setLayoutParams(cameraContainerParams);
         cameraContainer.setMinimumHeight(dp(220));
 
-        cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("cardStroke"), 20));
+        cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("cardStrokeSoft"), 24));
         cameraContainer.setClipToOutline(true);
-        cameraContainer.setElevation(dp(2));
+        cameraContainer.setElevation(dp(3));
 
         previewView = new PreviewView(this);
         previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
@@ -414,8 +441,9 @@ public class MainActivity extends ComponentActivity {
         modeButton.setTextSize(12);
         modeButton.setTextColor(Color.WHITE);
         modeButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        modeButton.setBackground(createCardDrawable(color("overlay"), 0, 24));
+        modeButton.setBackground(createCardDrawable(color("overlay"), color("glassBorder"), 24));
         modeButton.setPadding(dp(12), 0, dp(12), 0);
+        modeButton.setElevation(dp(2));
         FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(46));
         modeParams.gravity = Gravity.BOTTOM | Gravity.START;
         modeParams.setMargins(dp(14), 0, 0, dp(14));
@@ -423,7 +451,7 @@ public class MainActivity extends ComponentActivity {
         modeButton.setOnClickListener(v -> {
             isAutoScanMode = !isAutoScanMode;
             modeButton.setText(isAutoScanMode ? "AUTO" : "HOLD");
-            modeButton.setBackground(createCardDrawable(color(isAutoScanMode ? "overlay" : "overlayActive"), 0, 24));
+            modeButton.setBackground(createCardDrawable(color(isAutoScanMode ? "overlay" : "overlayActive"), color("glassBorder"), 24));
             toast(isAutoScanMode ? "Auto Scan Enabled" : "Tap and hold camera to scan");
         });
         cameraContainer.addView(modeButton);
@@ -433,7 +461,8 @@ public class MainActivity extends ComponentActivity {
         flashButton.setImageResource(R.drawable.ic_flash_off);
         flashButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
         flashButton.setPadding(dp(12), dp(12), dp(12), dp(12));
-        flashButton.setBackground(createCardDrawable(color("overlay"), 0, 24));
+        flashButton.setBackground(createCardDrawable(color("overlay"), color("glassBorder"), 24));
+        flashButton.setElevation(dp(2));
         FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(dp(46), dp(46));
         flashParams.gravity = Gravity.BOTTOM | Gravity.END;
         flashParams.setMargins(0, 0, dp(14), dp(14));
@@ -443,7 +472,7 @@ public class MainActivity extends ComponentActivity {
                 isFlashOn = !isFlashOn;
                 camera.getCameraControl().enableTorch(isFlashOn);
                 flashButton.setImageResource(isFlashOn ? R.drawable.ic_flash : R.drawable.ic_flash_off);
-                flashButton.setBackground(createCardDrawable(color(isFlashOn ? "overlayActive" : "overlay"), 0, 24));
+                flashButton.setBackground(createCardDrawable(color(isFlashOn ? "overlayActive" : "overlay"), color("glassBorder"), 24));
             } else {
                 toast("Flash not supported.");
             }
@@ -460,9 +489,9 @@ public class MainActivity extends ComponentActivity {
 
         ImageButton historyBtn = new ImageButton(this);
         historyBtn.setImageResource(R.drawable.ic_history);
-        historyBtn.setColorFilter(color("textSub"));
+        historyBtn.setColorFilter(color("accentGreen"));
         historyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        historyBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
+        historyBtn.setBackground(createGradientDrawable(color("cardTop"), color("cardBottom"), color("cardStrokeSoft"), 12));
         historyBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
         LinearLayout.LayoutParams historyBtnParams = new LinearLayout.LayoutParams(dp(40), dp(40));
         historyBtnParams.setMargins(0, 0, dp(10), 0);
@@ -489,9 +518,9 @@ public class MainActivity extends ComponentActivity {
         // Manual Intervention Console
         LinearLayout manualPanel = new LinearLayout(this);
         manualPanel.setOrientation(LinearLayout.VERTICAL);
-        manualPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 14));
+        manualPanel.setBackground(createGradientDrawable(color("cardTop"), color("cardBottom"), color("cardStrokeSoft"), 18));
         manualPanel.setPadding(dp(12), dp(12), dp(12), dp(12));
-        manualPanel.setElevation(dp(1));
+        manualPanel.setElevation(dp(2));
 
         LinearLayout manualRow = new LinearLayout(this);
         manualRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -504,8 +533,11 @@ public class MainActivity extends ComponentActivity {
         manualInput.setTextSize(15);
         manualInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
 
-        manualInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 10));
-        manualInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+        manualInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 14));
+        manualInput.setPadding(dp(14), dp(10), dp(14), dp(10));
+
+        manualInput.setOnFocusChangeListener((v, hasFocus) -> manualInput.setBackground(
+                createCardDrawable(color("inputBg"), hasFocus ? color("accentIndigo") : color("cardStroke"), 14)));
 
         manualInput.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -519,8 +551,9 @@ public class MainActivity extends ComponentActivity {
         ImageButton sendButton = new ImageButton(this);
         sendButton.setImageResource(R.drawable.ic_send);
         sendButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 10));
+        sendButton.setBackground(createGradientDrawable(color("btnSend"), color("btnSendEnd"), 0, 14));
         sendButton.setPadding(dp(14), dp(12), dp(14), dp(12));
+        sendButton.setElevation(dp(2));
         sendButton.setOnClickListener(v -> sendManualValue());
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -577,7 +610,7 @@ public class MainActivity extends ComponentActivity {
                             // Create Individual History Card
                             LinearLayout itemCard = new LinearLayout(this);
                             itemCard.setOrientation(LinearLayout.VERTICAL);
-                            itemCard.setBackground(createCardDrawable(color("card"), color("cardStroke"), 8));
+                            itemCard.setBackground(createGradientDrawable(color("cardTop"), color("cardBottom"), color("cardStrokeSoft"), 14));
                             itemCard.setPadding(dp(12), dp(12), dp(12), dp(12));
 
                             // Time and Data Text
@@ -607,7 +640,7 @@ public class MainActivity extends ComponentActivity {
                             ImageButton copyBtn = new ImageButton(this);
                             copyBtn.setImageResource(R.drawable.ic_copy);
                             copyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                            copyBtn.setBackground(createCardDrawable(color("btnRefresh"), 0, 8));
+                            copyBtn.setBackground(createGradientDrawable(color("btnRefresh"), color("btnRefreshEnd"), 0, 12));
                             copyBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
                             copyBtn.setOnClickListener(v -> {
                                 android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
@@ -620,7 +653,7 @@ public class MainActivity extends ComponentActivity {
                             ImageButton sendBtn = new ImageButton(this);
                             sendBtn.setImageResource(R.drawable.ic_send);
                             sendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                            sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 8));
+                            sendBtn.setBackground(createGradientDrawable(color("btnSend"), color("btnSendEnd"), 0, 12));
                             sendBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
                             sendBtn.setOnClickListener(v -> {
                                 if (isTyping) {
@@ -690,7 +723,7 @@ public class MainActivity extends ComponentActivity {
         int titleId = getResources().getIdentifier("alertTitle", "id", "android");
         TextView titleTv = dialog.findViewById(titleId);
         if (titleTv != null) titleTv.setTextColor(Color.WHITE);
-        dialog.getWindow().setBackgroundDrawable(createCardDrawable(color("card"), color("cardStroke"), 12));
+        dialog.getWindow().setBackgroundDrawable(createGradientDrawable(color("cardTop"), color("cardBottom"), color("cardStrokeSoft"), 18));
     }
 
     private void showInstructionsDialog() {
@@ -718,15 +751,45 @@ public class MainActivity extends ComponentActivity {
         return drawable;
     }
 
+    /** Diagonal gradient drawable used for premium depth on cards, buttons and pills. */
+    private GradientDrawable createGradientDrawable(int startColor, int endColor, int strokeColor, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{startColor, endColor});
+        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        drawable.setCornerRadius(dp(radiusDp));
+        return drawable;
+    }
+
+    /** Small glowing status dot: soft translucent halo behind a solid accent core. */
+    private android.graphics.drawable.Drawable createGlowDot(int accentColor) {
+        GradientDrawable glow = new GradientDrawable();
+        glow.setShape(GradientDrawable.OVAL);
+        glow.setColor(withAlpha(accentColor, 70));
+
+        GradientDrawable core = new GradientDrawable();
+        core.setShape(GradientDrawable.OVAL);
+        core.setColor(accentColor);
+
+        android.graphics.drawable.Drawable[] layers = {glow, core};
+        android.graphics.drawable.LayerDrawable layered = new android.graphics.drawable.LayerDrawable(layers);
+        layered.setLayerInset(1, dp(3), dp(3), dp(3), dp(3));
+        return layered;
+    }
+
     private void updateStatusUI(String message, String colorKey) {
         runOnUiThread(() -> {
             statusText.setText(message);
-            statusCard.setBackground(createCardDrawable(color(colorKey), 0, 24));
-            GradientDrawable dotShape = new GradientDrawable();
-            dotShape.setShape(GradientDrawable.OVAL);
-            dotShape.setColor(statusDotColor(colorKey));
-            statusDot.setBackground(dotShape);
+            statusCard.setBackground(createGradientDrawable(color(colorKey), color(pillGradientEndKey(colorKey)), color("cardStrokeSoft"), 26));
+            statusDot.setBackground(createGlowDot(statusDotColor(colorKey)));
         });
+    }
+
+    /** Pairs each status pill start color with its gradient end color for a subtle diagonal fade. */
+    private String pillGradientEndKey(String colorKey) {
+        switch (colorKey) {
+            case "pillConnected": return "pillConnectedEnd";
+            case "btnDisconnect": return "btnDisconnectEnd";
+            default: return "pillDefaultEnd";
+        }
     }
 
     /** Brighter accent used for the small status dot, distinct from the pill background. */
@@ -765,7 +828,7 @@ public class MainActivity extends ComponentActivity {
                 String name = hidConnectedDevice.getName() == null ? "Unknown Host" : hidConnectedDevice.getName();
                 updateStatusUI("Connected to " + name, "pillConnected");
                 runOnUiThread(() -> {
-                    connectButton.setBackground(createCardDrawable(color("btnDisconnect"), 0, 10));
+                    connectButton.setBackground(createGradientDrawable(color("btnDisconnect"), color("btnDisconnectEnd"), 0, 14));
                     connectButton.setText(" Disconnect");
                 });
             } else {
@@ -774,7 +837,7 @@ public class MainActivity extends ComponentActivity {
                     updateStatusUI("Scanner ready. Select target.", "pillDefault");
                 }
                 runOnUiThread(() -> {
-                    connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
+                    connectButton.setBackground(createGradientDrawable(color("btnConnect"), color("btnConnectEnd"), 0, 14));
                     connectButton.setText(" Connect");
                 });
             }
