@@ -39,6 +39,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.activity.ComponentActivity;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
@@ -65,10 +66,12 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+@RequiresApi(api = Build.VERSION_CODES.P)
 public class MainActivity extends ComponentActivity {
     private static final int PERMISSION_REQUEST = 101;
 
@@ -111,8 +114,10 @@ public class MainActivity extends ComponentActivity {
     private BluetoothDevice hidConnectedDevice;
     private boolean isAppRegistered = false;
 
-    // Concurrency Lock & Feature States
+    // Safe Concurrency Queuing System
+    private final ConcurrentLinkedQueue<String> scanQueue = new ConcurrentLinkedQueue<>();
     private volatile boolean isTyping = false;
+
     private boolean isAutoScanMode = true;
     private boolean isCameraTouched = false;
 
@@ -210,6 +215,7 @@ public class MainActivity extends ComponentActivity {
 
     @SuppressLint("ClickableViewAccessibility")
     private void buildLayout() {
+        // Changed to purely vertical LinearLayout (No ScrollView) to prevent scrolling
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(color("bg"));
@@ -221,7 +227,7 @@ public class MainActivity extends ComponentActivity {
             return WindowInsetsCompat.CONSUMED;
         });
 
-        // Brand Row (logo + app name)
+        // Brand Row
         LinearLayout brandRow = new LinearLayout(this);
         brandRow.setOrientation(LinearLayout.HORIZONTAL);
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -376,11 +382,11 @@ public class MainActivity extends ComponentActivity {
         root.addView(scannerLabel);
 
         // Viewport / Camera Frame
+        // Using weight 1f locks the layout in place perfectly so there is no scroll
         FrameLayout cameraContainer = new FrameLayout(this);
         LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         cameraContainerParams.setMargins(0, 0, 0, dp(16));
         cameraContainer.setLayoutParams(cameraContainerParams);
-        cameraContainer.setMinimumHeight(dp(220));
 
         cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("cardStroke"), 20));
         cameraContainer.setClipToOutline(true);
@@ -442,7 +448,6 @@ public class MainActivity extends ComponentActivity {
             if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
                 isFlashOn = !isFlashOn;
                 camera.getCameraControl().enableTorch(isFlashOn);
-                flashButton.setImageResource(isFlashOn ? R.drawable.ic_flash : R.drawable.ic_flash_off);
                 flashButton.setBackground(createCardDrawable(color(isFlashOn ? "overlayActive" : "overlay"), 0, 24));
             } else {
                 toast("Flash not supported.");
@@ -476,7 +481,21 @@ public class MainActivity extends ComponentActivity {
         lastScanText.setTextSize(14);
         lastScanText.setTypeface(android.graphics.Typeface.MONOSPACE);
         lastScanText.setPadding(dp(12), 0, 0, 0);
-        historyRow.addView(lastScanText);
+        LinearLayout.LayoutParams lastScanParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        historyRow.addView(lastScanText, lastScanParams);
+
+        // Bulk Auto Sender Button
+        ImageButton bulkSendBtn = new ImageButton(this);
+        bulkSendBtn.setImageResource(android.R.drawable.ic_menu_agenda);
+        bulkSendBtn.setColorFilter(color("textSub"));
+        bulkSendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        bulkSendBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
+        bulkSendBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
+        LinearLayout.LayoutParams bulkBtnParams = new LinearLayout.LayoutParams(dp(40), dp(40));
+        bulkBtnParams.setMargins(dp(10), 0, 0, 0);
+        bulkSendBtn.setLayoutParams(bulkBtnParams);
+        bulkSendBtn.setOnClickListener(v -> showBulkSendDialog());
+        historyRow.addView(bulkSendBtn);
 
         root.addView(historyRow);
 
@@ -488,13 +507,11 @@ public class MainActivity extends ComponentActivity {
 
         // Manual Intervention Console
         LinearLayout manualPanel = new LinearLayout(this);
-        manualPanel.setOrientation(LinearLayout.VERTICAL);
+        manualPanel.setOrientation(LinearLayout.HORIZONTAL);
+        manualPanel.setGravity(Gravity.CENTER_VERTICAL);
         manualPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 14));
         manualPanel.setPadding(dp(12), dp(12), dp(12), dp(12));
         manualPanel.setElevation(dp(1));
-
-        LinearLayout manualRow = new LinearLayout(this);
-        manualRow.setGravity(Gravity.CENTER_VERTICAL);
 
         manualInput = new EditText(this);
         manualInput.setSingleLine(true);
@@ -503,7 +520,6 @@ public class MainActivity extends ComponentActivity {
         manualInput.setTextColor(color("textMain"));
         manualInput.setTextSize(15);
         manualInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
-
         manualInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 10));
         manualInput.setPadding(dp(12), dp(10), dp(12), dp(10));
 
@@ -517,7 +533,8 @@ public class MainActivity extends ComponentActivity {
 
         // Icon Based Manual Send Button
         ImageButton sendButton = new ImageButton(this);
-        sendButton.setImageResource(R.drawable.ic_send);
+        sendButton.setImageResource(android.R.drawable.ic_menu_send);
+        sendButton.setColorFilter(Color.WHITE);
         sendButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
         sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 10));
         sendButton.setPadding(dp(14), dp(12), dp(14), dp(12));
@@ -525,12 +542,208 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         inputParams.setMargins(0, 0, dp(10), 0);
-        manualRow.addView(manualInput, inputParams);
-        manualRow.addView(sendButton, new LinearLayout.LayoutParams(dp(50), dp(44)));
-        manualPanel.addView(manualRow);
+        manualPanel.addView(manualInput, inputParams);
+        manualPanel.addView(sendButton, new LinearLayout.LayoutParams(dp(50), dp(44)));
+
         root.addView(manualPanel);
 
+        // Root replaces the outer ScrollView directly
         setContentView(root);
+    }
+
+    // --- BULK AUTO SENDER SYSTEM ---
+    private void showBulkSendDialog() {
+        LinearLayout dialogLayout = new LinearLayout(this);
+        dialogLayout.setOrientation(LinearLayout.VERTICAL);
+        dialogLayout.setPadding(dp(16), dp(16), dp(16), dp(16));
+        dialogLayout.setBackgroundColor(color("bg"));
+
+        // Custom Header with Close Button
+        LinearLayout headerRow = new LinearLayout(this);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        headerParams.setMargins(0, 0, 0, dp(16));
+        headerRow.setLayoutParams(headerParams);
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Bulk Auto-Sender");
+        titleTv.setTextColor(Color.WHITE);
+        titleTv.setTextSize(18);
+        titleTv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        headerRow.addView(titleTv, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        ImageButton closeBtn = new ImageButton(this);
+        closeBtn.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+        closeBtn.setBackground(null);
+        closeBtn.setColorFilter(color("textSub"));
+        closeBtn.setPadding(dp(8), dp(8), dp(8), dp(8));
+        headerRow.addView(closeBtn);
+
+        dialogLayout.addView(headerRow);
+
+        EditText bulkInput = new EditText(this);
+        bulkInput.setHint("Paste multiple barcodes here\n14344965381363\n134096105661695\n...");
+        bulkInput.setHintTextColor(color("textSub"));
+        bulkInput.setTextColor(color("textMain"));
+        bulkInput.setTextSize(15);
+        bulkInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 8));
+        bulkInput.setPadding(dp(12), dp(12), dp(12), dp(12));
+        bulkInput.setGravity(Gravity.TOP | Gravity.START);
+        bulkInput.setSingleLine(false);
+        bulkInput.setMinLines(8);
+        bulkInput.setMaxLines(12);
+
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        inputParams.setMargins(0, 0, 0, dp(16));
+        dialogLayout.addView(bulkInput, inputParams);
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button stopBtn = new Button(this);
+        stopBtn.setText("Stop");
+        stopBtn.setAllCaps(false);
+        stopBtn.setTextColor(Color.WHITE);
+        stopBtn.setBackground(createCardDrawable(color("btnDisconnect"), 0, 8));
+        LinearLayout.LayoutParams stopParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        stopParams.setMargins(0, 0, dp(8), 0);
+        btnRow.addView(stopBtn, stopParams);
+
+        Button sendBtn = new Button(this);
+        sendBtn.setText("Send");
+        sendBtn.setAllCaps(false);
+        sendBtn.setTextColor(Color.WHITE);
+        sendBtn.setBackground(createCardDrawable(color("btnConnect"), 0, 8));
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        sendParams.setMargins(dp(8), 0, 0, 0);
+        btnRow.addView(sendBtn, sendParams);
+
+        dialogLayout.addView(btnRow);
+
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setView(dialogLayout)
+                .show();
+
+        dialog.getWindow().setBackgroundDrawable(createCardDrawable(color("card"), color("cardStroke"), 12));
+
+        closeBtn.setOnClickListener(v -> dialog.dismiss());
+
+        final boolean[] isBulkSending = {false};
+
+        stopBtn.setOnClickListener(v -> {
+            isBulkSending[0] = false;
+            toast("Bulk sending stopped.");
+            resetScreenTimeout(); // Restores normal screen sleep logic
+        });
+
+        sendBtn.setOnClickListener(v -> {
+            if (hidDeviceProxy == null || hidConnectedDevice == null) {
+                triggerErrorBeep();
+                toast("Transmission failed: Not connected.");
+                return;
+            }
+            if (isBulkSending[0]) {
+                toast("Already sending...");
+                return;
+            }
+            isBulkSending[0] = true;
+            toast("Starting bulk send...");
+
+            // KEEPS SCREEN ON INFINITELY WHILE SENDING
+            runOnUiThread(() -> {
+                getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                screenHandler.removeCallbacks(screenOffRunnable);
+            });
+
+            new Thread(() -> {
+                while (isBulkSending[0]) {
+                    String[] currentText = new String[1];
+                    runOnUiThread(() -> currentText[0] = bulkInput.getText().toString());
+                    try { Thread.sleep(50); } catch (InterruptedException e) {}
+
+                    if (currentText[0] == null || currentText[0].trim().isEmpty()) {
+                        isBulkSending[0] = false;
+                        runOnUiThread(() -> {
+                            toast("Finished bulk sending.");
+                            resetScreenTimeout(); // Restore sleep
+                        });
+                        break;
+                    }
+
+                    String[] lines = currentText[0].split("\n");
+                    String lineToSend = null;
+                    int firstValidIndex = -1;
+                    for (int i = 0; i < lines.length; i++) {
+                        if (!lines[i].trim().isEmpty()) {
+                            lineToSend = lines[i].trim();
+                            firstValidIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (lineToSend == null) {
+                        isBulkSending[0] = false;
+                        runOnUiThread(() -> {
+                            toast("Finished bulk sending.");
+                            resetScreenTimeout(); // Restore sleep
+                        });
+                        break;
+                    }
+
+                    // Wait if camera or manual input is currently typing
+                    while (isTyping && isBulkSending[0]) {
+                        try { Thread.sleep(100); } catch (InterruptedException e) {}
+                    }
+                    if (!isBulkSending[0]) break;
+
+                    isTyping = true; // Claim the lock
+                    triggerSuccessBeep();
+                    String finalLine = lineToSend;
+                    runOnUiThread(() -> lastScanText.setText("Bulk scan: " + finalLine));
+
+                    try {
+                        for (char c : (finalLine + "\n").toCharArray()) {
+                            byte[] report = charToHidReport(c);
+                            hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
+                            Thread.sleep(12);
+                            hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                            Thread.sleep(12);
+                        }
+                    } catch (Exception e) {}
+
+                    try { Thread.sleep(250); } catch (InterruptedException ignored) {}
+                    isTyping = false; // Release the lock
+                    processQueue(); // Resume any standard scans waiting in queue
+
+                    // Remove sent line from UI
+                    final int indexToRemove = firstValidIndex;
+                    runOnUiThread(() -> {
+                        StringBuilder newText = new StringBuilder();
+                        for (int i = 0; i < lines.length; i++) {
+                            if (i == indexToRemove) continue;
+                            newText.append(lines[i]);
+                            if (i < lines.length - 1) newText.append("\n");
+                        }
+                        bulkInput.setText(newText.toString());
+                        bulkInput.setSelection(0);
+                    });
+
+                    // Wait exactly 3 seconds before processing the next list item
+                    try {
+                        for(int i=0; i<30; i++) {
+                            if(!isBulkSending[0]) break;
+                            Thread.sleep(100);
+                        }
+                    } catch (InterruptedException e) {}
+                }
+            }).start();
+        });
+
+        dialog.setOnDismissListener(d -> {
+            isBulkSending[0] = false;
+            resetScreenTimeout(); // Restore normal sleep logic if user closes box
+        });
     }
 
     // --- SCAN HISTORY SYSTEM ---
@@ -574,13 +787,11 @@ public class MainActivity extends ComponentActivity {
                             updatedHistory.append(entry).append("|||");
                             hasData = true;
 
-                            // Create Individual History Card
                             LinearLayout itemCard = new LinearLayout(this);
                             itemCard.setOrientation(LinearLayout.VERTICAL);
                             itemCard.setBackground(createCardDrawable(color("card"), color("cardStroke"), 8));
                             itemCard.setPadding(dp(12), dp(12), dp(12), dp(12));
 
-                            // Time and Data Text
                             TextView timeTv = new TextView(this);
                             timeTv.setText(sdf.format(new Date(timestamp)));
                             timeTv.setTextColor(color("textSub"));
@@ -595,7 +806,6 @@ public class MainActivity extends ComponentActivity {
                             valTv.setPadding(0, dp(4), 0, 0);
                             itemCard.addView(valTv);
 
-                            // Action Buttons Row
                             LinearLayout btnRow = new LinearLayout(this);
                             btnRow.setOrientation(LinearLayout.HORIZONTAL);
                             btnRow.setGravity(Gravity.END);
@@ -603,7 +813,6 @@ public class MainActivity extends ComponentActivity {
                             btnRowParams.setMargins(0, dp(8), 0, 0);
                             btnRow.setLayoutParams(btnRowParams);
 
-                            // Copy Button (Icon Only)
                             ImageButton copyBtn = new ImageButton(this);
                             copyBtn.setImageResource(R.drawable.ic_copy);
                             copyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -616,7 +825,6 @@ public class MainActivity extends ComponentActivity {
                                 toast("Copied!");
                             });
 
-                            // Send Button (Icon Only)
                             ImageButton sendBtn = new ImageButton(this);
                             sendBtn.setImageResource(R.drawable.ic_send);
                             sendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -631,8 +839,8 @@ public class MainActivity extends ComponentActivity {
                                     triggerErrorBeep();
                                     toast("Transmission failed: Not connected.");
                                 } else {
-                                    triggerSuccessBeep();
-                                    sendValue(scannedData);
+                                    scanQueue.add(scannedData);
+                                    processQueue();
                                 }
                             });
 
@@ -658,12 +866,6 @@ public class MainActivity extends ComponentActivity {
             emptyState.setOrientation(LinearLayout.VERTICAL);
             emptyState.setGravity(Gravity.CENTER);
             emptyState.setPadding(0, dp(32), 0, dp(32));
-
-            ImageView emptyIcon = new ImageView(this);
-            emptyIcon.setImageResource(R.drawable.ic_empty_history);
-            LinearLayout.LayoutParams emptyIconParams = new LinearLayout.LayoutParams(dp(48), dp(48));
-            emptyIconParams.setMargins(0, 0, 0, dp(10));
-            emptyState.addView(emptyIcon, emptyIconParams);
 
             TextView empty = new TextView(this);
             empty.setText("No scans in the last 48 hours.");
@@ -729,7 +931,6 @@ public class MainActivity extends ComponentActivity {
         });
     }
 
-    /** Brighter accent used for the small status dot, distinct from the pill background. */
     private int statusDotColor(String colorKey) {
         switch (colorKey) {
             case "pillConnected": return color("accentGreen");
@@ -737,8 +938,6 @@ public class MainActivity extends ComponentActivity {
             default: return color("textSub");
         }
     }
-
-    // --- BLUETOOTH SYNC ENGINES ---
 
     @SuppressLint("MissingPermission")
     private void restoreLastDevice() {
@@ -977,36 +1176,19 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void handleScan(String value) {
-        // NEW FEATURE: Enforce tap-to-scan mode lock
         if (!isAutoScanMode && !isCameraTouched) return;
 
-        if (isTyping) return; // Prevent concurrent overlapping hardware scans
-
         long now = System.currentTimeMillis();
+        // Prevent duplicate scanning of exact same code within 1.8s
         if (value.equals(lastSent) && now - lastSentAt < 1800) return;
         lastSent = value;
         lastSentAt = now;
 
-        if (hidDeviceProxy == null || hidConnectedDevice == null) {
-            triggerErrorBeep();
-            runOnUiThread(() -> toast("Scan failed: Not connected to a computer."));
-            return;
-        }
-
-        triggerSuccessBeep();
-        resetScreenTimeout();
-        saveScanToHistory(value);
-
-        runOnUiThread(() -> lastScanText.setText("Last scan: " + value));
-        sendValue(value);
+        scanQueue.add(value);
+        processQueue();
     }
 
     private void sendManualValue() {
-        if (isTyping) {
-            toast("Please wait, currently sending data...");
-            return;
-        }
-
         String value = manualInput.getText().toString().trim();
         if (value.isEmpty()) return;
 
@@ -1016,12 +1198,51 @@ public class MainActivity extends ComponentActivity {
             return;
         }
 
+        scanQueue.add(value);
+        manualInput.setText("");
+        processQueue();
+    }
+
+    // Core Queue Processor - handles overlapping scans sequentially
+    private synchronized void processQueue() {
+        if (isTyping || scanQueue.isEmpty()) return;
+        String nextValue = scanQueue.poll();
+        if (nextValue != null) {
+            sendValueFromQueue(nextValue);
+        }
+    }
+
+    private void sendValueFromQueue(String value) {
+        if (hidDeviceProxy == null || hidConnectedDevice == null) {
+            triggerErrorBeep();
+            runOnUiThread(() -> toast("Scan failed: Not connected to a computer."));
+            processQueue();
+            return;
+        }
+
+        isTyping = true;
         triggerSuccessBeep();
         resetScreenTimeout();
         saveScanToHistory(value);
-        sendValue(value);
+        runOnUiThread(() -> lastScanText.setText("Last scan: " + value));
 
-        manualInput.setText("");
+        new Thread(() -> {
+            try {
+                for (char c : (value + "\n").toCharArray()) {
+                    byte[] report = charToHidReport(c);
+                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
+                    Thread.sleep(12);
+                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                    Thread.sleep(12);
+                }
+            } catch (Exception ex) {
+                runOnUiThread(() -> updateStatusUI("Pipeline Error", "btnDisconnect"));
+            } finally {
+                try { Thread.sleep(250); } catch (InterruptedException ignored) {}
+                isTyping = false;
+                processQueue(); // Automatically process the next queued item
+            }
+        }).start();
     }
 
     private void triggerSuccessBeep() {
@@ -1034,29 +1255,6 @@ public class MainActivity extends ComponentActivity {
 
     private void triggerErrorBeep() {
         try { if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_SUP_ERROR, 350); } catch (Exception ignored) {}
-    }
-
-    @SuppressLint("MissingPermission")
-    private void sendValue(String value) {
-        if (hidDeviceProxy == null || hidConnectedDevice == null) return;
-
-        isTyping = true; // Lock thread to block rapid new barcode readings
-        new Thread(() -> {
-            try {
-                for (char c : (value + "\n").toCharArray()) {
-                    byte[] report = charToHidReport(c);
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 1, report);
-                    Thread.sleep(12);
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 1, new byte[8]);
-                    Thread.sleep(12);
-                }
-            } catch (Exception ex) {
-                updateStatusUI("Pipeline Error", "btnDisconnect");
-            } finally {
-                try { Thread.sleep(250); } catch (InterruptedException ignored) {} // Delay buffer before unlock
-                isTyping = false; // Unlock
-            }
-        }).start();
     }
 
     private byte[] charToHidReport(char c) {
@@ -1106,7 +1304,6 @@ public class MainActivity extends ComponentActivity {
         if (hidDeviceProxy != null) bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDeviceProxy);
     }
 
-    // Modern Camera Overlay
     private static class BarcodeOverlayView extends View {
         private final Paint bracketPaint;
         private final Paint boxPaint;
@@ -1158,7 +1355,6 @@ public class MainActivity extends ComponentActivity {
             float w = getWidth();
             float h = getHeight();
 
-            // Draw 4 corner brackets
             canvas.drawLine(padding, padding + bracketLength, padding, padding, bracketPaint);
             canvas.drawLine(padding, padding, padding + bracketLength, padding, bracketPaint);
 
@@ -1171,7 +1367,6 @@ public class MainActivity extends ComponentActivity {
             canvas.drawLine(w - padding - bracketLength, h - padding, w - padding, h - padding, bracketPaint);
             canvas.drawLine(w - padding, h - padding, w - padding, h - padding - bracketLength, bracketPaint);
 
-            // Draw Dynamic Green Bounding Box around the code
             if (hasTarget) {
                 canvas.drawRoundRect(calculatedRect, 16f, 16f, boxPaint);
             }
