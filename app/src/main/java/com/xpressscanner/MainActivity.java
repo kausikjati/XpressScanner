@@ -24,6 +24,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
@@ -110,8 +111,10 @@ public class MainActivity extends ComponentActivity {
     private BluetoothDevice hidConnectedDevice;
     private boolean isAppRegistered = false;
 
-    // Concurrency Lock to prevent overlapping data sends
+    // Concurrency Lock & Feature States
     private volatile boolean isTyping = false;
+    private boolean isAutoScanMode = true;
+    private boolean isCameraTouched = false;
 
     private ToneGenerator toneGenerator;
     private SharedPreferences prefs;
@@ -154,8 +157,6 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
-    // Professional slate + indigo palette. Static so it can also be used from the
-    // static BarcodeOverlayView nested class, keeping every color in one place.
     private static int color(String key) {
         switch(key) {
             case "bg": return Color.parseColor("#0B0F1A");
@@ -180,7 +181,6 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
-    /** Small uppercase eyebrow label used above each panel, e.g. "CONNECTION". */
     private TextView sectionLabel(String text) {
         TextView label = new TextView(this);
         label.setText(text);
@@ -208,6 +208,7 @@ public class MainActivity extends ComponentActivity {
         });
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private void buildLayout() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -374,8 +375,7 @@ public class MainActivity extends ComponentActivity {
         scannerLabel.setLayoutParams(scannerLabelParams);
         root.addView(scannerLabel);
 
-        // Viewport / Camera Frame — flexible height so the whole screen (including
-        // manual entry below) always fits without scrolling, on any screen size.
+        // Viewport / Camera Frame
         FrameLayout cameraContainer = new FrameLayout(this);
         LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         cameraContainerParams.setMargins(0, 0, 0, dp(16));
@@ -388,12 +388,47 @@ public class MainActivity extends ComponentActivity {
 
         previewView = new PreviewView(this);
         previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
+
+        // Touch Listener for Tap-to-Scan Feature
+        previewView.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    isCameraTouched = true;
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    isCameraTouched = false;
+                    return true;
+            }
+            return false;
+        });
+
         cameraContainer.addView(previewView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         barcodeOverlayView = new BarcodeOverlayView(this);
         cameraContainer.addView(barcodeOverlayView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        // Floating Flash Toggle
+        // Scan Mode Toggle Button (Bottom-Left)
+        Button modeButton = new Button(this);
+        modeButton.setText("AUTO");
+        modeButton.setTextSize(12);
+        modeButton.setTextColor(Color.WHITE);
+        modeButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        modeButton.setBackground(createCardDrawable(color("overlay"), 0, 24));
+        modeButton.setPadding(dp(12), 0, dp(12), 0);
+        FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(46));
+        modeParams.gravity = Gravity.BOTTOM | Gravity.START;
+        modeParams.setMargins(dp(14), 0, 0, dp(14));
+        modeButton.setLayoutParams(modeParams);
+        modeButton.setOnClickListener(v -> {
+            isAutoScanMode = !isAutoScanMode;
+            modeButton.setText(isAutoScanMode ? "AUTO" : "HOLD");
+            modeButton.setBackground(createCardDrawable(color(isAutoScanMode ? "overlay" : "overlayActive"), 0, 24));
+            toast(isAutoScanMode ? "Auto Scan Enabled" : "Tap and hold camera to scan");
+        });
+        cameraContainer.addView(modeButton);
+
+        // Floating Flash Toggle (Bottom-Right)
         ImageButton flashButton = new ImageButton(this);
         flashButton.setImageResource(R.drawable.ic_flash_off);
         flashButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -666,7 +701,7 @@ public class MainActivity extends ComponentActivity {
                 "3. Connect to Computer\n" +
                 "Tap \"Select Bluetooth Device\" and choose your computer. Tap \"Connect\".\n\n" +
                 "4. Scan Barcodes\n" +
-                "Point your camera at a barcode. The app will beam it directly to your computer!";
+                "Use the MODE button to switch between automatic scanning and \"tap and hold\" scanning!";
 
         new AlertDialog.Builder(this)
                 .setTitle("How to Use Scanner")
@@ -732,9 +767,6 @@ public class MainActivity extends ComponentActivity {
                 runOnUiThread(() -> {
                     connectButton.setBackground(createCardDrawable(color("btnDisconnect"), 0, 10));
                     connectButton.setText(" Disconnect");
-                    connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link_off, 0, 0, 0);
-                    connectButton.setCompoundDrawablePadding(dp(8));
-                    connectButton.setPaddingRelative(dp(14), 0, dp(14), 0);
                 });
             } else {
                 hidConnectedDevice = null;
@@ -744,9 +776,6 @@ public class MainActivity extends ComponentActivity {
                 runOnUiThread(() -> {
                     connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
                     connectButton.setText(" Connect");
-                    connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
-                    connectButton.setCompoundDrawablePadding(dp(8));
-                    connectButton.setPaddingRelative(dp(14), 0, dp(14), 0);
                 });
             }
         }
@@ -948,7 +977,10 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void handleScan(String value) {
-        if (isTyping) return; // FIX: Prevent concurrent overlapping hardware scans[cite: 6]
+        // NEW FEATURE: Enforce tap-to-scan mode lock
+        if (!isAutoScanMode && !isCameraTouched) return;
+
+        if (isTyping) return; // Prevent concurrent overlapping hardware scans
 
         long now = System.currentTimeMillis();
         if (value.equals(lastSent) && now - lastSentAt < 1800) return;
@@ -970,7 +1002,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void sendManualValue() {
-        if (isTyping) { // FIX: Prevent concurrent overlapping manual sends[cite: 6]
+        if (isTyping) {
             toast("Please wait, currently sending data...");
             return;
         }
@@ -1008,7 +1040,7 @@ public class MainActivity extends ComponentActivity {
     private void sendValue(String value) {
         if (hidDeviceProxy == null || hidConnectedDevice == null) return;
 
-        isTyping = true; // FIX: Lock thread[cite: 6]
+        isTyping = true; // Lock thread to block rapid new barcode readings
         new Thread(() -> {
             try {
                 for (char c : (value + "\n").toCharArray()) {
@@ -1021,8 +1053,8 @@ public class MainActivity extends ComponentActivity {
             } catch (Exception ex) {
                 updateStatusUI("Pipeline Error", "btnDisconnect");
             } finally {
-                try { Thread.sleep(250); } catch (InterruptedException ignored) {}
-                isTyping = false; // FIX: Unlock thread to allow next scan[cite: 6]
+                try { Thread.sleep(250); } catch (InterruptedException ignored) {} // Delay buffer before unlock
+                isTyping = false; // Unlock
             }
         }).start();
     }
@@ -1057,7 +1089,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void toast(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        runOnUiThread(() -> Toast.makeText(this, message, Toast.LENGTH_SHORT).show());
     }
 
     private int dp(int value) {
@@ -1094,7 +1126,7 @@ public class MainActivity extends ComponentActivity {
             bracketPaint.setAntiAlias(true);
 
             boxPaint = new Paint();
-            boxPaint.setColor(color("accentGreen")); // Scan target box
+            boxPaint.setColor(color("accentGreen")); // Scan target box, matches accent palette
             boxPaint.setStyle(Paint.Style.STROKE);
             boxPaint.setStrokeWidth(8f);
             boxPaint.setAntiAlias(true);
