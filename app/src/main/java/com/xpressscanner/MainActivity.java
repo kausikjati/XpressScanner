@@ -215,7 +215,6 @@ public class MainActivity extends ComponentActivity {
 
     @SuppressLint("ClickableViewAccessibility")
     private void buildLayout() {
-        // Changed to purely vertical LinearLayout (No ScrollView) to prevent scrolling
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(color("bg"));
@@ -382,7 +381,6 @@ public class MainActivity extends ComponentActivity {
         root.addView(scannerLabel);
 
         // Viewport / Camera Frame
-        // Using weight 1f locks the layout in place perfectly so there is no scroll
         FrameLayout cameraContainer = new FrameLayout(this);
         LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
         cameraContainerParams.setMargins(0, 0, 0, dp(16));
@@ -448,6 +446,7 @@ public class MainActivity extends ComponentActivity {
             if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
                 isFlashOn = !isFlashOn;
                 camera.getCameraControl().enableTorch(isFlashOn);
+                flashButton.setImageResource(isFlashOn ? R.drawable.ic_flash : R.drawable.ic_flash_off);
                 flashButton.setBackground(createCardDrawable(color(isFlashOn ? "overlayActive" : "overlay"), 0, 24));
             } else {
                 toast("Flash not supported.");
@@ -478,10 +477,14 @@ public class MainActivity extends ComponentActivity {
         lastScanText = new TextView(this);
         lastScanText.setText("Last scan: Ready for data...");
         lastScanText.setTextColor(color("accentGreen"));
-        lastScanText.setTextSize(14);
+        lastScanText.setTextSize(12);
         lastScanText.setTypeface(android.graphics.Typeface.MONOSPACE);
         lastScanText.setPadding(dp(12), 0, 0, 0);
-        LinearLayout.LayoutParams lastScanParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        lastScanText.setSingleLine(true);
+        lastScanText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+        LinearLayout.LayoutParams lastScanParams =
+                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         historyRow.addView(lastScanText, lastScanParams);
 
         // Bulk Auto Sender Button
@@ -520,6 +523,7 @@ public class MainActivity extends ComponentActivity {
         manualInput.setTextColor(color("textMain"));
         manualInput.setTextSize(15);
         manualInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
+
         manualInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 10));
         manualInput.setPadding(dp(12), dp(10), dp(12), dp(10));
 
@@ -533,8 +537,7 @@ public class MainActivity extends ComponentActivity {
 
         // Icon Based Manual Send Button
         ImageButton sendButton = new ImageButton(this);
-        sendButton.setImageResource(android.R.drawable.ic_menu_send);
-        sendButton.setColorFilter(Color.WHITE);
+        sendButton.setImageResource(R.drawable.ic_send);
         sendButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
         sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 10));
         sendButton.setPadding(dp(14), dp(12), dp(14), dp(12));
@@ -544,10 +547,8 @@ public class MainActivity extends ComponentActivity {
         inputParams.setMargins(0, 0, dp(10), 0);
         manualPanel.addView(manualInput, inputParams);
         manualPanel.addView(sendButton, new LinearLayout.LayoutParams(dp(50), dp(44)));
-
         root.addView(manualPanel);
 
-        // Root replaces the outer ScrollView directly
         setContentView(root);
     }
 
@@ -634,7 +635,7 @@ public class MainActivity extends ComponentActivity {
         stopBtn.setOnClickListener(v -> {
             isBulkSending[0] = false;
             toast("Bulk sending stopped.");
-            resetScreenTimeout(); // Restores normal screen sleep logic
+            resetScreenTimeout();
         });
 
         sendBtn.setOnClickListener(v -> {
@@ -650,7 +651,6 @@ public class MainActivity extends ComponentActivity {
             isBulkSending[0] = true;
             toast("Starting bulk send...");
 
-            // KEEPS SCREEN ON INFINITELY WHILE SENDING
             runOnUiThread(() -> {
                 getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                 screenHandler.removeCallbacks(screenOffRunnable);
@@ -666,7 +666,7 @@ public class MainActivity extends ComponentActivity {
                         isBulkSending[0] = false;
                         runOnUiThread(() -> {
                             toast("Finished bulk sending.");
-                            resetScreenTimeout(); // Restore sleep
+                            resetScreenTimeout();
                         });
                         break;
                     }
@@ -686,18 +686,17 @@ public class MainActivity extends ComponentActivity {
                         isBulkSending[0] = false;
                         runOnUiThread(() -> {
                             toast("Finished bulk sending.");
-                            resetScreenTimeout(); // Restore sleep
+                            resetScreenTimeout();
                         });
                         break;
                     }
 
-                    // Wait if camera or manual input is currently typing
                     while (isTyping && isBulkSending[0]) {
                         try { Thread.sleep(100); } catch (InterruptedException e) {}
                     }
                     if (!isBulkSending[0]) break;
 
-                    isTyping = true; // Claim the lock
+                    isTyping = true;
                     triggerSuccessBeep();
                     String finalLine = lineToSend;
                     runOnUiThread(() -> lastScanText.setText("Bulk scan: " + finalLine));
@@ -706,17 +705,24 @@ public class MainActivity extends ComponentActivity {
                         for (char c : (finalLine + "\n").toCharArray()) {
                             byte[] report = charToHidReport(c);
                             hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
-                            Thread.sleep(12);
+                            Thread.sleep(25); // Increased safety delay
                             hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
-                            Thread.sleep(12);
+                            Thread.sleep(25); // Increased safety delay
                         }
                     } catch (Exception e) {}
+                    finally {
+                        // FORCE RELEASE ALL KEYS on completion/error to prevent infinite loop typing on windows
+                        try {
+                            if (hidDeviceProxy != null && hidConnectedDevice != null) {
+                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                            }
+                        } catch (Exception ignored) {}
+                    }
 
                     try { Thread.sleep(250); } catch (InterruptedException ignored) {}
-                    isTyping = false; // Release the lock
-                    processQueue(); // Resume any standard scans waiting in queue
+                    isTyping = false;
+                    processQueue();
 
-                    // Remove sent line from UI
                     final int indexToRemove = firstValidIndex;
                     runOnUiThread(() -> {
                         StringBuilder newText = new StringBuilder();
@@ -729,7 +735,6 @@ public class MainActivity extends ComponentActivity {
                         bulkInput.setSelection(0);
                     });
 
-                    // Wait exactly 3 seconds before processing the next list item
                     try {
                         for(int i=0; i<30; i++) {
                             if(!isBulkSending[0]) break;
@@ -742,7 +747,7 @@ public class MainActivity extends ComponentActivity {
 
         dialog.setOnDismissListener(d -> {
             isBulkSending[0] = false;
-            resetScreenTimeout(); // Restore normal sleep logic if user closes box
+            resetScreenTimeout();
         });
     }
 
@@ -866,6 +871,12 @@ public class MainActivity extends ComponentActivity {
             emptyState.setOrientation(LinearLayout.VERTICAL);
             emptyState.setGravity(Gravity.CENTER);
             emptyState.setPadding(0, dp(32), 0, dp(32));
+
+            ImageView emptyIcon = new ImageView(this);
+            emptyIcon.setImageResource(R.drawable.ic_empty_history);
+            LinearLayout.LayoutParams emptyIconParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+            emptyIconParams.setMargins(0, 0, 0, dp(10));
+            emptyState.addView(emptyIcon, emptyIconParams);
 
             TextView empty = new TextView(this);
             empty.setText("No scans in the last 48 hours.");
@@ -1231,13 +1242,20 @@ public class MainActivity extends ComponentActivity {
                 for (char c : (value + "\n").toCharArray()) {
                     byte[] report = charToHidReport(c);
                     hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
-                    Thread.sleep(12);
+                    Thread.sleep(25); // Increased safety delay
                     hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
-                    Thread.sleep(12);
+                    Thread.sleep(25); // Increased safety delay
                 }
             } catch (Exception ex) {
                 runOnUiThread(() -> updateStatusUI("Pipeline Error", "btnDisconnect"));
             } finally {
+                // FORCE RELEASE ALL KEYS on completion/error to prevent infinite loop typing on windows
+                try {
+                    if (hidDeviceProxy != null && hidConnectedDevice != null) {
+                        hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                    }
+                } catch (Exception ignored) {}
+
                 try { Thread.sleep(250); } catch (InterruptedException ignored) {}
                 isTyping = false;
                 processQueue(); // Automatically process the next queued item
@@ -1323,7 +1341,7 @@ public class MainActivity extends ComponentActivity {
             bracketPaint.setAntiAlias(true);
 
             boxPaint = new Paint();
-            boxPaint.setColor(color("accentGreen")); // Scan target box, matches accent palette
+            boxPaint.setColor(color("accentGreen")); // Scan target box
             boxPaint.setStyle(Paint.Style.STROKE);
             boxPaint.setStrokeWidth(8f);
             boxPaint.setAntiAlias(true);
