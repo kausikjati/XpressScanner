@@ -829,29 +829,6 @@ public class MainActivity extends ComponentActivity {
         valTv.setPadding(0, dp(4), 0, 0);
         itemCard.addView(valTv);
 
-
-        LinearLayout repeatRow = new LinearLayout(this);
-        repeatRow.setOrientation(LinearLayout.HORIZONTAL);
-        repeatRow.setGravity(Gravity.CENTER_VERTICAL);
-        repeatRow.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 8));
-        repeatRow.setPadding(dp(12), dp(8), dp(12), dp(8));
-        LinearLayout.LayoutParams repeatRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        repeatRowParams.setMargins(0, 0, 0, dp(16));
-
-        TextView repeatLabel = new TextView(this);
-        repeatLabel.setText("Send each barcode twice");
-        repeatLabel.setTextColor(color("textMain"));
-        repeatLabel.setTextSize(14);
-        repeatRow.addView(repeatLabel, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-        Switch repeatSwitch = new Switch(this);
-        repeatSwitch.setTextColor(color("textSub"));
-        repeatSwitch.setText("Off");
-        repeatSwitch.setOnCheckedChangeListener((buttonView, isChecked) ->
-                buttonView.setText(isChecked ? "On" : "Off"));
-        repeatRow.addView(repeatSwitch);
-        dialogLayout.addView(repeatRow, repeatRowParams);
-
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setGravity(Gravity.END);
