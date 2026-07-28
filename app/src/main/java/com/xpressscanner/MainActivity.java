@@ -32,6 +32,7 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -565,6 +566,29 @@ public class MainActivity extends ComponentActivity {
         inputParams.setMargins(0, 0, 0, dp(16));
         dialogLayout.addView(bulkInput, inputParams);
 
+
+        LinearLayout repeatRow = new LinearLayout(this);
+        repeatRow.setOrientation(LinearLayout.HORIZONTAL);
+        repeatRow.setGravity(Gravity.CENTER_VERTICAL);
+        repeatRow.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 8));
+        repeatRow.setPadding(dp(12), dp(8), dp(12), dp(8));
+        LinearLayout.LayoutParams repeatRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        repeatRowParams.setMargins(0, 0, 0, dp(16));
+
+        TextView repeatLabel = new TextView(this);
+        repeatLabel.setText("Send each barcode twice");
+        repeatLabel.setTextColor(color("textMain"));
+        repeatLabel.setTextSize(14);
+        repeatRow.addView(repeatLabel, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Switch repeatSwitch = new Switch(this);
+        repeatSwitch.setTextColor(color("textSub"));
+        repeatSwitch.setText("Off");
+        repeatSwitch.setOnCheckedChangeListener((buttonView, isChecked) ->
+                buttonView.setText(isChecked ? "On" : "Off"));
+        repeatRow.addView(repeatSwitch);
+        dialogLayout.addView(repeatRow, repeatRowParams);
+
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
 
@@ -625,7 +649,11 @@ public class MainActivity extends ComponentActivity {
             new Thread(() -> {
                 while (isBulkSending[0]) {
                     String[] currentText = new String[1];
-                    runOnUiThread(() -> currentText[0] = bulkInput.getText().toString());
+                    boolean[] shouldRepeatLine = new boolean[1];
+                    runOnUiThread(() -> {
+                        currentText[0] = bulkInput.getText().toString();
+                        shouldRepeatLine[0] = repeatSwitch.isChecked();
+                    });
                     try { Thread.sleep(50); } catch (InterruptedException e) {}
 
                     if (currentText[0] == null || currentText[0].trim().isEmpty()) {
@@ -663,17 +691,25 @@ public class MainActivity extends ComponentActivity {
                     if (!isBulkSending[0]) break;
 
                     viewModel.setTyping(true);
-                    triggerSuccessBeep();
                     String finalLine = lineToSend;
-                    runOnUiThread(() -> lastScanText.setText("Bulk scan: " + finalLine));
+                    int repeatCount = shouldRepeatLine[0] ? 2 : 1;
 
                     try {
-                        for (char c : (finalLine + "\n").toCharArray()) {
-                            byte[] report = HidKeyboardMapper.charToHidReport(c);
-                            hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
-                            Thread.sleep(KEY_SEND_DELAY_MS);
-                            hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
-                            Thread.sleep(KEY_SEND_DELAY_MS);
+                        for (int repeatIndex = 0; repeatIndex < repeatCount && isBulkSending[0]; repeatIndex++) {
+                            triggerSuccessBeep();
+                            int displayRepeatIndex = repeatIndex + 1;
+                            runOnUiThread(() -> lastScanText.setText(repeatCount > 1
+                                    ? "Bulk scan " + displayRepeatIndex + "/" + repeatCount + ": " + finalLine
+                                    : "Bulk scan: " + finalLine));
+
+                            for (char c : (finalLine + "\n").toCharArray()) {
+                                byte[] report = HidKeyboardMapper.charToHidReport(c);
+                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
+                                Thread.sleep(KEY_SEND_DELAY_MS);
+                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                                Thread.sleep(KEY_SEND_DELAY_MS);
+                            }
+                            try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
                         }
                     } catch (Exception e) {}
                     finally {
@@ -684,8 +720,6 @@ public class MainActivity extends ComponentActivity {
                             }
                         } catch (Exception ignored) {}
                     }
-
-                    try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
                     viewModel.setTyping(false);
                     processQueue();
 
@@ -794,6 +828,29 @@ public class MainActivity extends ComponentActivity {
         valTv.setTypeface(android.graphics.Typeface.MONOSPACE);
         valTv.setPadding(0, dp(4), 0, 0);
         itemCard.addView(valTv);
+
+
+        LinearLayout repeatRow = new LinearLayout(this);
+        repeatRow.setOrientation(LinearLayout.HORIZONTAL);
+        repeatRow.setGravity(Gravity.CENTER_VERTICAL);
+        repeatRow.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 8));
+        repeatRow.setPadding(dp(12), dp(8), dp(12), dp(8));
+        LinearLayout.LayoutParams repeatRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        repeatRowParams.setMargins(0, 0, 0, dp(16));
+
+        TextView repeatLabel = new TextView(this);
+        repeatLabel.setText("Send each barcode twice");
+        repeatLabel.setTextColor(color("textMain"));
+        repeatLabel.setTextSize(14);
+        repeatRow.addView(repeatLabel, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Switch repeatSwitch = new Switch(this);
+        repeatSwitch.setTextColor(color("textSub"));
+        repeatSwitch.setText("Off");
+        repeatSwitch.setOnCheckedChangeListener((buttonView, isChecked) ->
+                buttonView.setText(isChecked ? "On" : "Off"));
+        repeatRow.addView(repeatSwitch);
+        dialogLayout.addView(repeatRow, repeatRowParams);
 
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
