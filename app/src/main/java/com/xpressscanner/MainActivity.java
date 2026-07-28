@@ -11,11 +11,8 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
@@ -35,6 +32,7 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -53,6 +51,13 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.lifecycle.ViewModelProvider;
+
+import com.xpressscanner.logic.HidKeyboardMapper;
+import com.xpressscanner.logic.ScanHistoryRepository;
+import com.xpressscanner.ui.AppColors;
+import com.xpressscanner.ui.BarcodeOverlayView;
+import com.xpressscanner.viewmodel.ScannerViewModel;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
@@ -60,13 +65,9 @@ import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -74,22 +75,13 @@ import java.util.concurrent.Executors;
 @RequiresApi(api = Build.VERSION_CODES.P)
 public class MainActivity extends ComponentActivity {
     private static final int PERMISSION_REQUEST = 101;
+    // Lower this value to send keys faster; raise it if the host misses characters.
+    private static final int KEY_SEND_DELAY_MS = 10;
+    private static final int KEY_SEND_SETTLE_DELAY_MS = 100;
 
-    private static final byte[] HID_KEYBOARD_DESCRIPTOR = {
-            (byte) 0x05, (byte) 0x01, (byte) 0x09, (byte) 0x06, (byte) 0xA1, (byte) 0x01,
-            (byte) 0x05, (byte) 0x07, (byte) 0x19, (byte) 0xE0, (byte) 0x29, (byte) 0xE7,
-            (byte) 0x15, (byte) 0x00, (byte) 0x25, (byte) 0x01, (byte) 0x75, (byte) 0x01,
-            (byte) 0x95, (byte) 0x08, (byte) 0x81, (byte) 0x02, (byte) 0x75, (byte) 0x08,
-            (byte) 0x95, (byte) 0x01, (byte) 0x81, (byte) 0x01, (byte) 0x05, (byte) 0x08,
-            (byte) 0x19, (byte) 0x01, (byte) 0x29, (byte) 0x05, (byte) 0x75, (byte) 0x01,
-            (byte) 0x95, (byte) 0x05, (byte) 0x91, (byte) 0x02, (byte) 0x75, (byte) 0x03,
-            (byte) 0x95, (byte) 0x01, (byte) 0x91, (byte) 0x01, (byte) 0x05, (byte) 0x07,
-            (byte) 0x19, (byte) 0x00, (byte) 0x29, (byte) 0x65, (byte) 0x15, (byte) 0x00,
-            (byte) 0x25, (byte) 0x65, (byte) 0x75, (byte) 0x08, (byte) 0x95, (byte) 0x06,
-            (byte) 0x81, (byte) 0x00, (byte) 0xC0
-    };
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService hidExecutor = Executors.newSingleThreadExecutor();
     private Camera camera;
     private boolean isFlashOn = false;
     private BarcodeScanner scanner;
@@ -114,18 +106,12 @@ public class MainActivity extends ComponentActivity {
     private BluetoothDevice hidConnectedDevice;
     private boolean isAppRegistered = false;
 
-    // Safe Concurrency Queuing System
-    private final ConcurrentLinkedQueue<String> scanQueue = new ConcurrentLinkedQueue<>();
-    private volatile boolean isTyping = false;
+    private ScannerViewModel viewModel;
+    private ScanHistoryRepository historyRepository;
 
-    private boolean isAutoScanMode = true;
-    private boolean isCameraTouched = false;
 
     private ToneGenerator toneGenerator;
     private SharedPreferences prefs;
-
-    private String lastSent = "";
-    private long lastSentAt = 0L;
 
     // Screen Wake
     private final Handler screenHandler = new Handler(Looper.getMainLooper());
@@ -136,6 +122,8 @@ public class MainActivity extends ComponentActivity {
         super.onCreate(savedInstanceState);
 
         prefs = getSharedPreferences("XpressPrefs", MODE_PRIVATE);
+        viewModel = new ViewModelProvider(this).get(ScannerViewModel.class);
+        historyRepository = new ScanHistoryRepository(prefs);
         scanner = BarcodeScanning.getClient();
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
@@ -162,28 +150,8 @@ public class MainActivity extends ComponentActivity {
         }
     }
 
-    private static int color(String key) {
-        switch(key) {
-            case "bg": return Color.parseColor("#0B0F1A");
-            case "card": return Color.parseColor("#141B2E");
-            case "cardStroke": return Color.parseColor("#232C42");
-            case "pillConnected": return Color.parseColor("#4338CA");
-            case "pillDefault": return Color.parseColor("#1C2438");
-            case "textMain": return Color.parseColor("#F1F5F9");
-            case "textSub": return Color.parseColor("#8B93A7");
-            case "textLabel": return Color.parseColor("#5B6478");
-            case "btnRefresh": return Color.parseColor("#2A3350");
-            case "btnDisconnect": return Color.parseColor("#DC2626");
-            case "btnConnect": return Color.parseColor("#15803D");
-            case "inputBg": return Color.parseColor("#0B0F1A");
-            case "btnSend": return Color.parseColor("#4F46E5");
-            case "accentGreen": return Color.parseColor("#2DD4BF");
-            case "accentIndigo": return Color.parseColor("#6366F1");
-            case "accentRed": return Color.parseColor("#F87171");
-            case "overlay": return Color.parseColor("#99000000");
-            case "overlayActive": return Color.parseColor("#CC1D4ED8");
-            default: return Color.WHITE;
-        }
+    public static int color(String key) {
+        return AppColors.color(key);
     }
 
     private TextView sectionLabel(String text) {
@@ -397,11 +365,11 @@ public class MainActivity extends ComponentActivity {
         previewView.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    isCameraTouched = true;
+                    viewModel.setCameraTouched(true);
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
-                    isCameraTouched = false;
+                    viewModel.setCameraTouched(false);
                     return true;
             }
             return false;
@@ -425,10 +393,10 @@ public class MainActivity extends ComponentActivity {
         modeParams.setMargins(dp(14), 0, 0, dp(14));
         modeButton.setLayoutParams(modeParams);
         modeButton.setOnClickListener(v -> {
-            isAutoScanMode = !isAutoScanMode;
-            modeButton.setText(isAutoScanMode ? "AUTO" : "HOLD");
-            modeButton.setBackground(createCardDrawable(color(isAutoScanMode ? "overlay" : "overlayActive"), 0, 24));
-            toast(isAutoScanMode ? "Auto Scan Enabled" : "Tap and hold camera to scan");
+            boolean autoScan = viewModel.toggleAutoScanMode();
+            modeButton.setText(autoScan ? "AUTO" : "HOLD");
+            modeButton.setBackground(createCardDrawable(color(autoScan ? "overlay" : "overlayActive"), 0, 24));
+            toast(autoScan ? "Auto Scan Enabled" : "Tap and hold camera to scan");
         });
         cameraContainer.addView(modeButton);
 
@@ -599,6 +567,29 @@ public class MainActivity extends ComponentActivity {
         inputParams.setMargins(0, 0, 0, dp(16));
         dialogLayout.addView(bulkInput, inputParams);
 
+
+        LinearLayout repeatRow = new LinearLayout(this);
+        repeatRow.setOrientation(LinearLayout.HORIZONTAL);
+        repeatRow.setGravity(Gravity.CENTER_VERTICAL);
+        repeatRow.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 8));
+        repeatRow.setPadding(dp(12), dp(8), dp(12), dp(8));
+        LinearLayout.LayoutParams repeatRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        repeatRowParams.setMargins(0, 0, 0, dp(16));
+
+        TextView repeatLabel = new TextView(this);
+        repeatLabel.setText("Send each barcode twice");
+        repeatLabel.setTextColor(color("textMain"));
+        repeatLabel.setTextSize(14);
+        repeatRow.addView(repeatLabel, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Switch repeatSwitch = new Switch(this);
+        repeatSwitch.setTextColor(color("textSub"));
+        repeatSwitch.setText("Off");
+        repeatSwitch.setOnCheckedChangeListener((buttonView, isChecked) ->
+                buttonView.setText(isChecked ? "On" : "Off"));
+        repeatRow.addView(repeatSwitch);
+        dialogLayout.addView(repeatRow, repeatRowParams);
+
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
 
@@ -656,10 +647,14 @@ public class MainActivity extends ComponentActivity {
                 screenHandler.removeCallbacks(screenOffRunnable);
             });
 
-            new Thread(() -> {
+            hidExecutor.execute(() -> {
                 while (isBulkSending[0]) {
                     String[] currentText = new String[1];
-                    runOnUiThread(() -> currentText[0] = bulkInput.getText().toString());
+                    boolean[] shouldRepeatLine = new boolean[1];
+                    runOnUiThread(() -> {
+                        currentText[0] = bulkInput.getText().toString();
+                        shouldRepeatLine[0] = repeatSwitch.isChecked();
+                    });
                     try { Thread.sleep(50); } catch (InterruptedException e) {}
 
                     if (currentText[0] == null || currentText[0].trim().isEmpty()) {
@@ -691,36 +686,36 @@ public class MainActivity extends ComponentActivity {
                         break;
                     }
 
-                    while (isTyping && isBulkSending[0]) {
+                    while (viewModel.isTyping() && isBulkSending[0]) {
                         try { Thread.sleep(100); } catch (InterruptedException e) {}
                     }
                     if (!isBulkSending[0]) break;
 
-                    isTyping = true;
-                    triggerSuccessBeep();
+                    viewModel.setTyping(true);
                     String finalLine = lineToSend;
-                    runOnUiThread(() -> lastScanText.setText("Bulk scan: " + finalLine));
+                    int repeatCount = shouldRepeatLine[0] ? 2 : 1;
 
                     try {
-                        for (char c : (finalLine + "\n").toCharArray()) {
-                            byte[] report = charToHidReport(c);
-                            hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
-                            Thread.sleep(25); // Increased safety delay
-                            hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
-                            Thread.sleep(25); // Increased safety delay
+                        for (int repeatIndex = 0; repeatIndex < repeatCount && isBulkSending[0]; repeatIndex++) {
+                            triggerSuccessBeep();
+                            int displayRepeatIndex = repeatIndex + 1;
+                            runOnUiThread(() -> lastScanText.setText(repeatCount > 1
+                                    ? "Bulk scan " + displayRepeatIndex + "/" + repeatCount + ": " + finalLine
+                                    : "Bulk scan: " + finalLine));
+
+                            sendTextOverHid(finalLine);
+                            try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
                         }
                     } catch (Exception e) {}
                     finally {
                         // FORCE RELEASE ALL KEYS on completion/error to prevent infinite loop typing on windows
                         try {
                             if (hidDeviceProxy != null && hidConnectedDevice != null) {
-                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, HidKeyboardMapper.RELEASE_REPORT);
                             }
                         } catch (Exception ignored) {}
                     }
-
-                    try { Thread.sleep(250); } catch (InterruptedException ignored) {}
-                    isTyping = false;
+                    viewModel.setTyping(false);
                     processQueue();
 
                     final int indexToRemove = firstValidIndex;
@@ -742,7 +737,7 @@ public class MainActivity extends ComponentActivity {
                         }
                     } catch (InterruptedException e) {}
                 }
-            }).start();
+            });
         });
 
         dialog.setOnDismissListener(d -> {
@@ -752,17 +747,9 @@ public class MainActivity extends ComponentActivity {
     }
 
     // --- SCAN HISTORY SYSTEM ---
-    private void saveScanToHistory(String value) {
-        String history = prefs.getString("scan_history", "");
-        long now = System.currentTimeMillis();
-        String newEntry = now + "|" + value + "|||";
-        prefs.edit().putString("scan_history", newEntry + history).apply();
-    }
 
     private void showHistoryDialog() {
-        String history = prefs.getString("scan_history", "");
-        long twoDaysMillis = 2L * 24 * 60 * 60 * 1000;
-        long cutoffTime = System.currentTimeMillis() - twoDaysMillis;
+        List<ScanHistoryRepository.ScanHistoryItem> historyItems = historyRepository.getRecentHistory();
 
         LinearLayout dialogLayout = new LinearLayout(this);
         dialogLayout.setOrientation(LinearLayout.VERTICAL);
@@ -773,100 +760,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout listLayout = new LinearLayout(this);
         listLayout.setOrientation(LinearLayout.VERTICAL);
 
-        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, HH:mm:ss", Locale.getDefault());
-        boolean hasData = false;
-
-        if (!history.isEmpty()) {
-            String[] entries = history.split("\\|\\|\\|");
-            StringBuilder updatedHistory = new StringBuilder();
-
-            for (String entry : entries) {
-                if (entry.trim().isEmpty()) continue;
-                String[] parts = entry.split("\\|");
-                if (parts.length == 2) {
-                    try {
-                        long timestamp = Long.parseLong(parts[0]);
-                        String scannedData = parts[1];
-
-                        if (timestamp >= cutoffTime) {
-                            updatedHistory.append(entry).append("|||");
-                            hasData = true;
-
-                            LinearLayout itemCard = new LinearLayout(this);
-                            itemCard.setOrientation(LinearLayout.VERTICAL);
-                            itemCard.setBackground(createCardDrawable(color("card"), color("cardStroke"), 8));
-                            itemCard.setPadding(dp(12), dp(12), dp(12), dp(12));
-
-                            TextView timeTv = new TextView(this);
-                            timeTv.setText(sdf.format(new Date(timestamp)));
-                            timeTv.setTextColor(color("textSub"));
-                            timeTv.setTextSize(12);
-                            itemCard.addView(timeTv);
-
-                            TextView valTv = new TextView(this);
-                            valTv.setText(scannedData);
-                            valTv.setTextColor(color("textMain"));
-                            valTv.setTextSize(16);
-                            valTv.setTypeface(android.graphics.Typeface.MONOSPACE);
-                            valTv.setPadding(0, dp(4), 0, 0);
-                            itemCard.addView(valTv);
-
-                            LinearLayout btnRow = new LinearLayout(this);
-                            btnRow.setOrientation(LinearLayout.HORIZONTAL);
-                            btnRow.setGravity(Gravity.END);
-                            LinearLayout.LayoutParams btnRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                            btnRowParams.setMargins(0, dp(8), 0, 0);
-                            btnRow.setLayoutParams(btnRowParams);
-
-                            ImageButton copyBtn = new ImageButton(this);
-                            copyBtn.setImageResource(R.drawable.ic_copy);
-                            copyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                            copyBtn.setBackground(createCardDrawable(color("btnRefresh"), 0, 8));
-                            copyBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
-                            copyBtn.setOnClickListener(v -> {
-                                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                                android.content.ClipData clip = android.content.ClipData.newPlainText("Barcode", scannedData);
-                                clipboard.setPrimaryClip(clip);
-                                toast("Copied!");
-                            });
-
-                            ImageButton sendBtn = new ImageButton(this);
-                            sendBtn.setImageResource(R.drawable.ic_send);
-                            sendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                            sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 8));
-                            sendBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
-                            sendBtn.setOnClickListener(v -> {
-                                if (isTyping) {
-                                    toast("Please wait, currently sending data...");
-                                    return;
-                                }
-                                if (hidDeviceProxy == null || hidConnectedDevice == null) {
-                                    triggerErrorBeep();
-                                    toast("Transmission failed: Not connected.");
-                                } else {
-                                    scanQueue.add(scannedData);
-                                    processQueue();
-                                }
-                            });
-
-                            LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(dp(44), dp(36));
-                            btnParams.setMargins(dp(12), 0, 0, 0);
-
-                            btnRow.addView(copyBtn, btnParams);
-                            btnRow.addView(sendBtn, btnParams);
-                            itemCard.addView(btnRow);
-
-                            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                            lp.setMargins(0, 0, 0, dp(8));
-                            listLayout.addView(itemCard, lp);
-                        }
-                    } catch (Exception ignored) {}
-                }
-            }
-            prefs.edit().putString("scan_history", updatedHistory.toString()).apply();
-        }
-
-        if (!hasData) {
+        if (historyItems.isEmpty()) {
             LinearLayout emptyState = new LinearLayout(this);
             emptyState.setOrientation(LinearLayout.VERTICAL);
             emptyState.setGravity(Gravity.CENTER);
@@ -885,6 +779,10 @@ public class MainActivity extends ComponentActivity {
             emptyState.addView(empty);
 
             listLayout.addView(emptyState);
+        } else {
+            for (ScanHistoryRepository.ScanHistoryItem item : historyItems) {
+                listLayout.addView(createHistoryItemView(item), historyItemLayoutParams());
+            }
         }
 
         scrollView.addView(listLayout);
@@ -895,7 +793,7 @@ public class MainActivity extends ComponentActivity {
                 .setView(dialogLayout)
                 .setPositiveButton("Close", null)
                 .setNegativeButton("Clear All", (d, w) -> {
-                    prefs.edit().remove("scan_history").apply();
+                    historyRepository.clearHistory();
                     toast("History cleared");
                 })
                 .show();
@@ -904,6 +802,66 @@ public class MainActivity extends ComponentActivity {
         TextView titleTv = dialog.findViewById(titleId);
         if (titleTv != null) titleTv.setTextColor(Color.WHITE);
         dialog.getWindow().setBackgroundDrawable(createCardDrawable(color("card"), color("cardStroke"), 12));
+    }
+
+    private View createHistoryItemView(ScanHistoryRepository.ScanHistoryItem item) {
+        LinearLayout itemCard = new LinearLayout(this);
+        itemCard.setOrientation(LinearLayout.VERTICAL);
+        itemCard.setBackground(createCardDrawable(color("card"), color("cardStroke"), 8));
+        itemCard.setPadding(dp(12), dp(12), dp(12), dp(12));
+
+        TextView timeTv = new TextView(this);
+        timeTv.setText(item.formattedTime);
+        timeTv.setTextColor(color("textSub"));
+        timeTv.setTextSize(12);
+        itemCard.addView(timeTv);
+
+        TextView valTv = new TextView(this);
+        valTv.setText(item.value);
+        valTv.setTextColor(color("textMain"));
+        valTv.setTextSize(16);
+        valTv.setTypeface(android.graphics.Typeface.MONOSPACE);
+        valTv.setPadding(0, dp(4), 0, 0);
+        itemCard.addView(valTv);
+
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.END);
+        LinearLayout.LayoutParams btnRowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        btnRowParams.setMargins(0, dp(8), 0, 0);
+        btnRow.setLayoutParams(btnRowParams);
+
+        ImageButton copyBtn = new ImageButton(this);
+        copyBtn.setImageResource(R.drawable.ic_copy);
+        copyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        copyBtn.setBackground(createCardDrawable(color("btnRefresh"), 0, 8));
+        copyBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
+        copyBtn.setOnClickListener(v -> {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            android.content.ClipData clip = android.content.ClipData.newPlainText("Barcode", item.value);
+            clipboard.setPrimaryClip(clip);
+            toast("Copied!");
+        });
+
+        ImageButton sendBtn = new ImageButton(this);
+        sendBtn.setImageResource(R.drawable.ic_send);
+        sendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        sendBtn.setBackground(createCardDrawable(color("btnSend"), 0, 8));
+        sendBtn.setPadding(dp(11), dp(8), dp(11), dp(8));
+        sendBtn.setOnClickListener(v -> enqueueScan(item.value));
+
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(dp(44), dp(36));
+        btnParams.setMargins(dp(12), 0, 0, 0);
+        btnRow.addView(copyBtn, btnParams);
+        btnRow.addView(sendBtn, btnParams);
+        itemCard.addView(btnRow);
+        return itemCard;
+    }
+
+    private LinearLayout.LayoutParams historyItemLayoutParams() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, 0, 0, dp(8));
+        return lp;
     }
 
     private void showInstructionsDialog() {
@@ -1060,7 +1018,7 @@ public class MainActivity extends ComponentActivity {
     @SuppressLint("MissingPermission")
     private void registerHidApp() {
         BluetoothHidDeviceAppSdpSettings sdpSettings = new BluetoothHidDeviceAppSdpSettings(
-                "Xpress HID Scanner", "Android Bluetooth Scanner", "Xpress", (byte) 0x00, HID_KEYBOARD_DESCRIPTOR
+                "Xpress HID Scanner", "Android Bluetooth Scanner", "Xpress", (byte) 0x00, HidKeyboardMapper.HID_KEYBOARD_DESCRIPTOR
         );
         hidDeviceProxy.registerApp(sdpSettings, null, null, ContextCompat.getMainExecutor(this), new BluetoothHidDevice.Callback() {
             @Override
@@ -1187,15 +1145,21 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void handleScan(String value) {
-        if (!isAutoScanMode && !isCameraTouched) return;
+        if (!viewModel.shouldAcceptScan(value)) return;
+        enqueueScan(value);
+    }
 
-        long now = System.currentTimeMillis();
-        // Prevent duplicate scanning of exact same code within 1.8s
-        if (value.equals(lastSent) && now - lastSentAt < 1800) return;
-        lastSent = value;
-        lastSentAt = now;
-
-        scanQueue.add(value);
+    private void enqueueScan(String value) {
+        if (viewModel.isTyping()) {
+            toast("Please wait, currently sending data...");
+            return;
+        }
+        if (hidDeviceProxy == null || hidConnectedDevice == null) {
+            triggerErrorBeep();
+            toast("Transmission failed: Not connected.");
+            return;
+        }
+        viewModel.enqueueScan(value);
         processQueue();
     }
 
@@ -1209,15 +1173,15 @@ public class MainActivity extends ComponentActivity {
             return;
         }
 
-        scanQueue.add(value);
+        viewModel.enqueueScan(value);
         manualInput.setText("");
         processQueue();
     }
 
     // Core Queue Processor - handles overlapping scans sequentially
     private synchronized void processQueue() {
-        if (isTyping || scanQueue.isEmpty()) return;
-        String nextValue = scanQueue.poll();
+        if (viewModel.isTyping() || !viewModel.hasPendingScans()) return;
+        String nextValue = viewModel.pollScan();
         if (nextValue != null) {
             sendValueFromQueue(nextValue);
         }
@@ -1231,36 +1195,39 @@ public class MainActivity extends ComponentActivity {
             return;
         }
 
-        isTyping = true;
+        viewModel.setTyping(true);
         triggerSuccessBeep();
         resetScreenTimeout();
-        saveScanToHistory(value);
+        historyRepository.saveScan(value);
         runOnUiThread(() -> lastScanText.setText("Last scan: " + value));
 
-        new Thread(() -> {
+        hidExecutor.execute(() -> {
             try {
-                for (char c : (value + "\n").toCharArray()) {
-                    byte[] report = charToHidReport(c);
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
-                    Thread.sleep(25); // Increased safety delay
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
-                    Thread.sleep(25); // Increased safety delay
-                }
+                sendTextOverHid(value);
             } catch (Exception ex) {
                 runOnUiThread(() -> updateStatusUI("Pipeline Error", "btnDisconnect"));
             } finally {
                 // FORCE RELEASE ALL KEYS on completion/error to prevent infinite loop typing on windows
                 try {
                     if (hidDeviceProxy != null && hidConnectedDevice != null) {
-                        hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                        hidDeviceProxy.sendReport(hidConnectedDevice, 0, HidKeyboardMapper.RELEASE_REPORT);
                     }
                 } catch (Exception ignored) {}
 
-                try { Thread.sleep(250); } catch (InterruptedException ignored) {}
-                isTyping = false;
+                try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
+                viewModel.setTyping(false);
                 processQueue(); // Automatically process the next queued item
             }
-        }).start();
+        });
+    }
+
+    private void sendTextOverHid(String value) throws InterruptedException {
+        for (char c : (value + "\n").toCharArray()) {
+            hidDeviceProxy.sendReport(hidConnectedDevice, 0, HidKeyboardMapper.charToHidReport(c));
+            Thread.sleep(KEY_SEND_DELAY_MS);
+            hidDeviceProxy.sendReport(hidConnectedDevice, 0, HidKeyboardMapper.RELEASE_REPORT);
+            Thread.sleep(KEY_SEND_DELAY_MS);
+        }
     }
 
     private void triggerSuccessBeep() {
@@ -1273,30 +1240,6 @@ public class MainActivity extends ComponentActivity {
 
     private void triggerErrorBeep() {
         try { if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_SUP_ERROR, 350); } catch (Exception ignored) {}
-    }
-
-    private byte[] charToHidReport(char c) {
-        byte mod = 0; byte key = 0;
-        if (c >= 'a' && c <= 'z') key = (byte) (c - 'a' + 4);
-        else if (c >= 'A' && c <= 'Z') { mod = 2; key = (byte) (c - 'A' + 4); }
-        else if (c >= '1' && c <= '9') key = (byte) (c - '1' + 30);
-        else if (c == '0') key = 39;
-        else if (c == '\n') key = 40;
-        else if (c == ' ') key = 44;
-        else if (c == '-') key = 45;
-        else if (c == '=') key = 46;
-        else if (c == '[') key = 47;
-        else if (c == ']') key = 48;
-        else if (c == '\\') key = 49;
-        else if (c == ';') key = 51;
-        else if (c == '\'') key = 52;
-        else if (c == ',') key = 54;
-        else if (c == '.') key = 55;
-        else if (c == '/') key = 56;
-        else if (c == '_') { mod = 2; key = 45; }
-        else if (c == '+') { mod = 2; key = 46; }
-        else if (c == ':') { mod = 2; key = 51; }
-        return new byte[]{mod, 0, key, 0, 0, 0, 0, 0};
     }
 
     private boolean hasBluetoothPermission() {
@@ -1317,77 +1260,11 @@ public class MainActivity extends ComponentActivity {
         super.onDestroy();
         scanner.close();
         cameraExecutor.shutdown();
+        hidExecutor.shutdown();
         screenHandler.removeCallbacks(screenOffRunnable);
         if (toneGenerator != null) toneGenerator.release();
         if (hidDeviceProxy != null) bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDeviceProxy);
     }
 
-    private static class BarcodeOverlayView extends View {
-        private final Paint bracketPaint;
-        private final Paint boxPaint;
-        private final RectF calculatedRect = new RectF();
-        private boolean hasTarget = false;
-        private final float padding = 40f;
-        private final float bracketLength = 60f;
 
-        public BarcodeOverlayView(Context context) {
-            super(context);
-
-            bracketPaint = new Paint();
-            bracketPaint.setColor(color("cardStroke"));
-            bracketPaint.setStyle(Paint.Style.STROKE);
-            bracketPaint.setStrokeWidth(12f);
-            bracketPaint.setStrokeCap(Paint.Cap.ROUND);
-            bracketPaint.setAntiAlias(true);
-
-            boxPaint = new Paint();
-            boxPaint.setColor(color("accentGreen")); // Scan target box
-            boxPaint.setStyle(Paint.Style.STROKE);
-            boxPaint.setStrokeWidth(8f);
-            boxPaint.setAntiAlias(true);
-        }
-
-        public void updateBox(Rect rect, int imageWidth, int imageHeight) {
-            float scaleX = (float) getWidth() / imageHeight;
-            float scaleY = (float) getHeight() / imageWidth;
-
-            calculatedRect.left = rect.left * scaleX;
-            calculatedRect.right = rect.right * scaleX;
-            calculatedRect.top = rect.top * scaleY;
-            calculatedRect.bottom = rect.bottom * scaleY;
-
-            hasTarget = true;
-            postInvalidate();
-        }
-
-        public void clear() {
-            if (hasTarget) {
-                hasTarget = false;
-                postInvalidate();
-            }
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            float w = getWidth();
-            float h = getHeight();
-
-            canvas.drawLine(padding, padding + bracketLength, padding, padding, bracketPaint);
-            canvas.drawLine(padding, padding, padding + bracketLength, padding, bracketPaint);
-
-            canvas.drawLine(w - padding - bracketLength, padding, w - padding, padding, bracketPaint);
-            canvas.drawLine(w - padding, padding, w - padding, padding + bracketLength, bracketPaint);
-
-            canvas.drawLine(padding, h - padding - bracketLength, padding, h - padding, bracketPaint);
-            canvas.drawLine(padding, h - padding, padding + bracketLength, h - padding, bracketPaint);
-
-            canvas.drawLine(w - padding - bracketLength, h - padding, w - padding, h - padding, bracketPaint);
-            canvas.drawLine(w - padding, h - padding, w - padding, h - padding - bracketLength, bracketPaint);
-
-            if (hasTarget) {
-                canvas.drawRoundRect(calculatedRect, 16f, 16f, boxPaint);
-            }
-        }
-    }
 }
