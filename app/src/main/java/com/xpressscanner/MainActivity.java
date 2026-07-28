@@ -74,6 +74,9 @@ import java.util.concurrent.Executors;
 @RequiresApi(api = Build.VERSION_CODES.P)
 public class MainActivity extends ComponentActivity {
     private static final int PERMISSION_REQUEST = 101;
+    // Lower this value to send keys faster; raise it if the host misses characters.
+    private static final int KEY_SEND_DELAY_MS = 10;
+    private static final int KEY_SEND_SETTLE_DELAY_MS = 100;
 
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
@@ -668,9 +671,9 @@ public class MainActivity extends ComponentActivity {
                         for (char c : (finalLine + "\n").toCharArray()) {
                             byte[] report = HidKeyboardMapper.charToHidReport(c);
                             hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
-                            Thread.sleep(25); // Increased safety delay
+                            Thread.sleep(KEY_SEND_DELAY_MS);
                             hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
-                            Thread.sleep(25); // Increased safety delay
+                            Thread.sleep(KEY_SEND_DELAY_MS);
                         }
                     } catch (Exception e) {}
                     finally {
@@ -682,7 +685,7 @@ public class MainActivity extends ComponentActivity {
                         } catch (Exception ignored) {}
                     }
 
-                    try { Thread.sleep(250); } catch (InterruptedException ignored) {}
+                    try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
                     viewModel.setTyping(false);
                     processQueue();
 
@@ -1174,9 +1177,9 @@ public class MainActivity extends ComponentActivity {
                 for (char c : (value + "\n").toCharArray()) {
                     byte[] report = HidKeyboardMapper.charToHidReport(c);
                     hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
-                    Thread.sleep(25); // Increased safety delay
+                    Thread.sleep(KEY_SEND_DELAY_MS);
                     hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
-                    Thread.sleep(25); // Increased safety delay
+                    Thread.sleep(KEY_SEND_DELAY_MS);
                 }
             } catch (Exception ex) {
                 runOnUiThread(() -> updateStatusUI("Pipeline Error", "btnDisconnect"));
@@ -1188,7 +1191,7 @@ public class MainActivity extends ComponentActivity {
                     }
                 } catch (Exception ignored) {}
 
-                try { Thread.sleep(250); } catch (InterruptedException ignored) {}
+                try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
                 viewModel.setTyping(false);
                 processQueue(); // Automatically process the next queued item
             }
