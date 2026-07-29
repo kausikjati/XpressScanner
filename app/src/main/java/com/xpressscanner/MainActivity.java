@@ -79,9 +79,11 @@ public class MainActivity extends ComponentActivity {
     private static final int KEY_SEND_DELAY_MS = 10;
     private static final int KEY_SEND_SETTLE_DELAY_MS = 100;
     private static final int BULK_REPEAT_SEND_DELAY_MS = 1000;
+    private static final byte[] EMPTY_HID_REPORT = new byte[8];
 
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService hidExecutor = Executors.newSingleThreadExecutor();
     private Camera camera;
     private boolean isFlashOn = false;
     private BarcodeScanner scanner;
@@ -647,7 +649,7 @@ public class MainActivity extends ComponentActivity {
                 screenHandler.removeCallbacks(screenOffRunnable);
             });
 
-            new Thread(() -> {
+            hidExecutor.execute(() -> {
                 while (isBulkSending[0]) {
                     String[] currentText = new String[1];
                     boolean[] shouldRepeatLine = new boolean[1];
@@ -703,16 +705,17 @@ public class MainActivity extends ComponentActivity {
                                     ? "Bulk scan " + displayRepeatIndex + "/" + repeatCount + ": " + finalLine
                                     : "Bulk scan: " + finalLine));
 
-                            for (char c : (finalLine + "\n").toCharArray()) {
+                            for (int charIndex = 0; charIndex <= finalLine.length(); charIndex++) {
+                                char c = charIndex == finalLine.length() ? '\n' : finalLine.charAt(charIndex);
                                 byte[] report = HidKeyboardMapper.charToHidReport(c);
                                 hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
                                 Thread.sleep(KEY_SEND_DELAY_MS);
-                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
                                 Thread.sleep(KEY_SEND_DELAY_MS);
                             }
-                            try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
+                            sleepQuietly(KEY_SEND_SETTLE_DELAY_MS);
                             if (repeatIndex < repeatCount - 1 && isBulkSending[0]) {
-                                try { Thread.sleep(BULK_REPEAT_SEND_DELAY_MS); } catch (InterruptedException ignored) {}
+                                sleepQuietly(BULK_REPEAT_SEND_DELAY_MS);
                             }
                         }
                     } catch (Exception e) {}
@@ -720,7 +723,7 @@ public class MainActivity extends ComponentActivity {
                         // FORCE RELEASE ALL KEYS on completion/error to prevent infinite loop typing on windows
                         try {
                             if (hidDeviceProxy != null && hidConnectedDevice != null) {
-                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
                             }
                         } catch (Exception ignored) {}
                     }
@@ -746,7 +749,7 @@ public class MainActivity extends ComponentActivity {
                         }
                     } catch (InterruptedException e) {}
                 }
-            }).start();
+            });
         });
 
         dialog.setOnDismissListener(d -> {
@@ -1210,13 +1213,14 @@ public class MainActivity extends ComponentActivity {
         historyRepository.saveScan(value);
         runOnUiThread(() -> lastScanText.setText("Last scan: " + value));
 
-        new Thread(() -> {
+        hidExecutor.execute(() -> {
             try {
-                for (char c : (value + "\n").toCharArray()) {
+                for (int i = 0; i <= value.length(); i++) {
+                    char c = i == value.length() ? '\n' : value.charAt(i);
                     byte[] report = HidKeyboardMapper.charToHidReport(c);
                     hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
                     Thread.sleep(KEY_SEND_DELAY_MS);
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
                     Thread.sleep(KEY_SEND_DELAY_MS);
                 }
             } catch (Exception ex) {
@@ -1225,15 +1229,19 @@ public class MainActivity extends ComponentActivity {
                 // FORCE RELEASE ALL KEYS on completion/error to prevent infinite loop typing on windows
                 try {
                     if (hidDeviceProxy != null && hidConnectedDevice != null) {
-                        hidDeviceProxy.sendReport(hidConnectedDevice, 0, new byte[8]);
+                        hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
                     }
                 } catch (Exception ignored) {}
 
-                try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
+                sleepQuietly(KEY_SEND_SETTLE_DELAY_MS);
                 viewModel.setTyping(false);
                 processQueue(); // Automatically process the next queued item
             }
-        }).start();
+        });
+    }
+
+    private void sleepQuietly(long millis) {
+        try { Thread.sleep(millis); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
     }
 
     private void triggerSuccessBeep() {
@@ -1266,6 +1274,7 @@ public class MainActivity extends ComponentActivity {
         super.onDestroy();
         scanner.close();
         cameraExecutor.shutdown();
+        hidExecutor.shutdown();
         screenHandler.removeCallbacks(screenOffRunnable);
         if (toneGenerator != null) toneGenerator.release();
         if (hidDeviceProxy != null) bluetoothAdapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDeviceProxy);
