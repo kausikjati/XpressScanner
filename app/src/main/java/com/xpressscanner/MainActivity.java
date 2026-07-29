@@ -78,6 +78,7 @@ public class MainActivity extends ComponentActivity {
     // Lower this value to send keys faster; raise it if the host misses characters.
     private static final int KEY_SEND_DELAY_MS = 10;
     private static final int KEY_SEND_SETTLE_DELAY_MS = 100;
+    private static final int BULK_REPEAT_SEND_DELAY_MS = 1000;
 
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
@@ -710,6 +711,9 @@ public class MainActivity extends ComponentActivity {
                                 Thread.sleep(KEY_SEND_DELAY_MS);
                             }
                             try { Thread.sleep(KEY_SEND_SETTLE_DELAY_MS); } catch (InterruptedException ignored) {}
+                            if (repeatIndex < repeatCount - 1 && isBulkSending[0]) {
+                                try { Thread.sleep(BULK_REPEAT_SEND_DELAY_MS); } catch (InterruptedException ignored) {}
+                            }
                         }
                     } catch (Exception e) {}
                     finally {
