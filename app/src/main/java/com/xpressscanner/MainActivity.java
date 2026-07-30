@@ -1010,6 +1010,16 @@ public class MainActivity extends ComponentActivity {
         return true;
     }
 
+    private void showBluetoothOffMessage() {
+        updateStatusUI("Your Bluetooth is off. Turn it on to connect.", "btnDisconnect");
+        runOnUiThread(() -> {
+            deviceButton.setText("Bluetooth is off");
+            connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
+            connectButton.setText(" Connect");
+        });
+        toast("Your Bluetooth is off. Turn it on to connect.");
+    }
+
     @SuppressLint("MissingPermission")
     private void setupHidProfile() {
         if (bluetoothAdapter == null) return;
@@ -1060,7 +1070,7 @@ public class MainActivity extends ComponentActivity {
     private void loadPairedDevices() {
         pairedDevices.clear();
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-            deviceButton.setText("Bluetooth configuration failed");
+            showBluetoothOffMessage();
             return;
         }
         Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
@@ -1085,6 +1095,11 @@ public class MainActivity extends ComponentActivity {
 
     @SuppressLint("MissingPermission")
     private void toggleConnection() {
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+            showBluetoothOffMessage();
+            return;
+        }
+
         if (hidDeviceProxy == null) {
             toast("Framework restarting. Please wait...");
             setupHidProfile();
