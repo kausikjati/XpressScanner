@@ -80,6 +80,7 @@ public class MainActivity extends ComponentActivity {
     private static final int KEY_SEND_SETTLE_DELAY_MS = 100;
     private static final int BULK_REPEAT_SEND_DELAY_MS = 1000;
     private static final byte[] EMPTY_HID_REPORT = new byte[8];
+    private static final String CONNECTION_LOST_MESSAGE = "Connection stale. Reconnect from Windows Bluetooth.";
 
 
     private final ExecutorService cameraExecutor = Executors.newSingleThreadExecutor();
@@ -632,7 +633,7 @@ public class MainActivity extends ComponentActivity {
         });
 
         sendBtn.setOnClickListener(v -> {
-            if (hidDeviceProxy == null || hidConnectedDevice == null) {
+            if (!hasActiveHidConnection()) {
                 triggerErrorBeep();
                 toast("Transmission failed: Not connected.");
                 return;
@@ -697,6 +698,7 @@ public class MainActivity extends ComponentActivity {
                     String finalLine = lineToSend;
                     int repeatCount = shouldRepeatLine[0] ? 2 : 1;
 
+                    boolean transmissionSucceeded = false;
                     try {
                         for (int repeatIndex = 0; repeatIndex < repeatCount && isBulkSending[0]; repeatIndex++) {
                             triggerSuccessBeep();
@@ -708,9 +710,9 @@ public class MainActivity extends ComponentActivity {
                             for (int charIndex = 0; charIndex <= finalLine.length(); charIndex++) {
                                 char c = charIndex == finalLine.length() ? '\n' : finalLine.charAt(charIndex);
                                 byte[] report = HidKeyboardMapper.charToHidReport(c);
-                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
+                                sendHidReportOrThrow(report);
                                 Thread.sleep(KEY_SEND_DELAY_MS);
-                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
+                                sendHidReportOrThrow(EMPTY_HID_REPORT);
                                 Thread.sleep(KEY_SEND_DELAY_MS);
                             }
                             sleepQuietly(KEY_SEND_SETTLE_DELAY_MS);
@@ -718,29 +720,30 @@ public class MainActivity extends ComponentActivity {
                                 sleepQuietly(BULK_REPEAT_SEND_DELAY_MS);
                             }
                         }
-                    } catch (Exception e) {}
-                    finally {
+                        transmissionSucceeded = true;
+                    } catch (Exception e) {
+                        handleHidSendFailure();
+                        isBulkSending[0] = false;
+                    } finally {
                         // FORCE RELEASE ALL KEYS on completion/error to prevent infinite loop typing on windows
-                        try {
-                            if (hidDeviceProxy != null && hidConnectedDevice != null) {
-                                hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
-                            }
-                        } catch (Exception ignored) {}
+                        releaseAllHidKeysQuietly();
                     }
                     viewModel.setTyping(false);
                     processQueue();
 
-                    final int indexToRemove = firstValidIndex;
-                    runOnUiThread(() -> {
-                        StringBuilder newText = new StringBuilder();
-                        for (int i = 0; i < lines.length; i++) {
-                            if (i == indexToRemove) continue;
-                            newText.append(lines[i]);
-                            if (i < lines.length - 1) newText.append("\n");
-                        }
-                        bulkInput.setText(newText.toString());
-                        bulkInput.setSelection(0);
-                    });
+                    if (transmissionSucceeded) {
+                        final int indexToRemove = firstValidIndex;
+                        runOnUiThread(() -> {
+                            StringBuilder newText = new StringBuilder();
+                            for (int i = 0; i < lines.length; i++) {
+                                if (i == indexToRemove) continue;
+                                newText.append(lines[i]);
+                                if (i < lines.length - 1) newText.append("\n");
+                            }
+                            bulkInput.setText(newText.toString());
+                            bulkInput.setSelection(0);
+                        });
+                    }
 
                     try {
                         for(int i=0; i<30; i++) {
@@ -1166,7 +1169,7 @@ public class MainActivity extends ComponentActivity {
             toast("Please wait, currently sending data...");
             return;
         }
-        if (hidDeviceProxy == null || hidConnectedDevice == null) {
+        if (!hasActiveHidConnection()) {
             triggerErrorBeep();
             toast("Transmission failed: Not connected.");
             return;
@@ -1179,7 +1182,7 @@ public class MainActivity extends ComponentActivity {
         String value = manualInput.getText().toString().trim();
         if (value.isEmpty()) return;
 
-        if (hidDeviceProxy == null || hidConnectedDevice == null) {
+        if (!hasActiveHidConnection()) {
             triggerErrorBeep();
             toast("Transmission failed: Not connected to a computer.");
             return;
@@ -1200,7 +1203,7 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void sendValueFromQueue(String value) {
-        if (hidDeviceProxy == null || hidConnectedDevice == null) {
+        if (!hasActiveHidConnection()) {
             triggerErrorBeep();
             runOnUiThread(() -> toast("Scan failed: Not connected to a computer."));
             processQueue();
@@ -1218,26 +1221,67 @@ public class MainActivity extends ComponentActivity {
                 for (int i = 0; i <= value.length(); i++) {
                     char c = i == value.length() ? '\n' : value.charAt(i);
                     byte[] report = HidKeyboardMapper.charToHidReport(c);
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, report);
+                    sendHidReportOrThrow(report);
                     Thread.sleep(KEY_SEND_DELAY_MS);
-                    hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
+                    sendHidReportOrThrow(EMPTY_HID_REPORT);
                     Thread.sleep(KEY_SEND_DELAY_MS);
                 }
             } catch (Exception ex) {
-                runOnUiThread(() -> updateStatusUI("Pipeline Error", "btnDisconnect"));
+                handleHidSendFailure();
             } finally {
                 // FORCE RELEASE ALL KEYS on completion/error to prevent infinite loop typing on windows
-                try {
-                    if (hidDeviceProxy != null && hidConnectedDevice != null) {
-                        hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
-                    }
-                } catch (Exception ignored) {}
+                releaseAllHidKeysQuietly();
 
                 sleepQuietly(KEY_SEND_SETTLE_DELAY_MS);
                 viewModel.setTyping(false);
                 processQueue(); // Automatically process the next queued item
             }
         });
+    }
+
+    @SuppressLint("MissingPermission")
+    private boolean hasActiveHidConnection() {
+        if (hidDeviceProxy == null || hidConnectedDevice == null) return false;
+        try {
+            if (hidDeviceProxy.getConnectionState(hidConnectedDevice) == BluetoothProfile.STATE_CONNECTED) {
+                return true;
+            }
+        } catch (RuntimeException ignored) {}
+        handleHidSendFailure();
+        return false;
+    }
+
+    @SuppressLint("MissingPermission")
+    private void sendHidReportOrThrow(byte[] report) {
+        if (!hasActiveHidConnection() || !hidDeviceProxy.sendReport(hidConnectedDevice, 0, report)) {
+            throw new IllegalStateException("HID report was not accepted by the Bluetooth stack");
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void handleHidSendFailure() {
+        BluetoothDevice staleDevice = hidConnectedDevice;
+        hidConnectedDevice = null;
+        runOnUiThread(() -> {
+            connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
+            connectButton.setText(" Connect");
+            updateStatusUI(CONNECTION_LOST_MESSAGE, "btnDisconnect");
+            toast("Bluetooth connection lost. Disconnect/reconnect Windows if needed.");
+        });
+        try {
+            if (hidDeviceProxy != null && staleDevice != null) {
+                hidDeviceProxy.disconnect(staleDevice);
+            }
+        } catch (RuntimeException ignored) {}
+    }
+
+    @SuppressLint("MissingPermission")
+    private void releaseAllHidKeysQuietly() {
+        try {
+            if (hidDeviceProxy != null && hidConnectedDevice != null) {
+                hidDeviceProxy.sendReport(hidConnectedDevice, 0, EMPTY_HID_REPORT);
+            }
+        } catch (RuntimeException ignored) {}
     }
 
     private void sleepQuietly(long millis) {
