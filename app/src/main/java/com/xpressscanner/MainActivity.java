@@ -9,6 +9,7 @@ import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
 import android.bluetooth.BluetoothProfile;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -17,6 +18,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.os.Build;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -55,6 +57,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.xpressscanner.logic.HidKeyboardMapper;
 import com.xpressscanner.logic.ScanHistoryRepository;
+import com.xpressscanner.logic.CsvScanStore;
 import com.xpressscanner.ui.AppColors;
 import com.xpressscanner.ui.BarcodeOverlayView;
 import com.xpressscanner.viewmodel.ScannerViewModel;
@@ -65,6 +68,8 @@ import com.google.mlkit.vision.barcode.BarcodeScanning;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -75,6 +80,8 @@ import java.util.concurrent.Executors;
 @RequiresApi(api = Build.VERSION_CODES.P)
 public class MainActivity extends ComponentActivity {
     private static final int PERMISSION_REQUEST = 101;
+    private static final int CREATE_CSV_FILE_REQUEST = 102;
+    private static final String STORE_SCANS_PREF = "store_scans_enabled";
     // Lower this value to send keys faster; raise it if the host misses characters.
     private static final int KEY_SEND_DELAY_MS = 10;
     private static final int KEY_SEND_SETTLE_DELAY_MS = 100;
@@ -99,6 +106,7 @@ public class MainActivity extends ComponentActivity {
     private EditText manualInput;
     private Button deviceButton;
     private Button connectButton;
+    private Switch storeSwitch;
 
     private BluetoothAdapter bluetoothAdapter;
     private final ArrayList<BluetoothDevice> pairedDevices = new ArrayList<>();
@@ -111,6 +119,7 @@ public class MainActivity extends ComponentActivity {
 
     private ScannerViewModel viewModel;
     private ScanHistoryRepository historyRepository;
+    private CsvScanStore csvScanStore;
 
 
     private ToneGenerator toneGenerator;
@@ -127,6 +136,7 @@ public class MainActivity extends ComponentActivity {
         prefs = getSharedPreferences("XpressPrefs", MODE_PRIVATE);
         viewModel = new ViewModelProvider(this).get(ScannerViewModel.class);
         historyRepository = new ScanHistoryRepository(prefs);
+        csvScanStore = new CsvScanStore(this);
         scanner = BarcodeScanning.getClient();
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100);
@@ -473,6 +483,64 @@ public class MainActivity extends ComponentActivity {
 
         root.addView(historyRow);
 
+        LinearLayout storePanel = new LinearLayout(this);
+        storePanel.setOrientation(LinearLayout.HORIZONTAL);
+        storePanel.setGravity(Gravity.CENTER_VERTICAL);
+        storePanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 14));
+        storePanel.setPadding(dp(12), dp(10), dp(12), dp(10));
+        LinearLayout.LayoutParams storePanelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        storePanelParams.setMargins(0, dp(10), 0, 0);
+
+        LinearLayout storeTextBlock = new LinearLayout(this);
+        storeTextBlock.setOrientation(LinearLayout.VERTICAL);
+        TextView storeTitle = new TextView(this);
+        storeTitle.setText("Store scans to CSV");
+        storeTitle.setTextColor(color("textMain"));
+        storeTitle.setTextSize(14);
+        storeTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        storeTextBlock.addView(storeTitle);
+        TextView storeSubtitle = new TextView(this);
+        storeSubtitle.setText("AWB Number and Date&Time columns");
+        storeSubtitle.setTextColor(color("textSub"));
+        storeSubtitle.setTextSize(11);
+        storeTextBlock.addView(storeSubtitle);
+        storePanel.addView(storeTextBlock, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Button saveCsvButton = new Button(this);
+        saveCsvButton.setText("Save");
+        saveCsvButton.setAllCaps(false);
+        saveCsvButton.setTextColor(color("textMain"));
+        saveCsvButton.setBackground(createCardDrawable(color("btnRefresh"), 0, 8));
+        saveCsvButton.setOnClickListener(v -> saveCsvFile());
+        LinearLayout.LayoutParams saveCsvParams = new LinearLayout.LayoutParams(dp(72), dp(40));
+        saveCsvParams.setMargins(dp(8), 0, 0, 0);
+        storePanel.addView(saveCsvButton, saveCsvParams);
+
+        Button shareCsvButton = new Button(this);
+        shareCsvButton.setText("Share");
+        shareCsvButton.setAllCaps(false);
+        shareCsvButton.setTextColor(Color.WHITE);
+        shareCsvButton.setBackground(createCardDrawable(color("btnSend"), 0, 8));
+        shareCsvButton.setOnClickListener(v -> shareCsvFile());
+        LinearLayout.LayoutParams shareCsvParams = new LinearLayout.LayoutParams(dp(76), dp(40));
+        shareCsvParams.setMargins(dp(8), 0, 0, 0);
+        storePanel.addView(shareCsvButton, shareCsvParams);
+
+        storeSwitch = new Switch(this);
+        storeSwitch.setTextColor(color("textSub"));
+        storeSwitch.setText(prefs.getBoolean(STORE_SCANS_PREF, false) ? "On" : "Off");
+        storeSwitch.setChecked(prefs.getBoolean(STORE_SCANS_PREF, false));
+        storeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            prefs.edit().putBoolean(STORE_SCANS_PREF, isChecked).apply();
+            buttonView.setText(isChecked ? "On" : "Off");
+            toast(isChecked ? "CSV scan storage enabled" : "CSV scan storage disabled");
+        });
+        LinearLayout.LayoutParams storeSwitchParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        storeSwitchParams.setMargins(dp(8), 0, 0, 0);
+        storePanel.addView(storeSwitch, storeSwitchParams);
+
+        root.addView(storePanel, storePanelParams);
+
         LinearLayout.LayoutParams manualLabelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         manualLabelParams.setMargins(dp(2), dp(8), 0, dp(8));
         TextView manualLabel = sectionLabel("MANUAL ENTRY");
@@ -732,6 +800,7 @@ public class MainActivity extends ComponentActivity {
                     processQueue();
 
                     if (transmissionSucceeded) {
+                        storeScanIfEnabled(finalLine);
                         final int indexToRemove = firstValidIndex;
                         runOnUiThread(() -> {
                             StringBuilder newText = new StringBuilder();
@@ -877,6 +946,53 @@ public class MainActivity extends ComponentActivity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0, 0, 0, dp(8));
         return lp;
+    }
+
+    private void saveCsvFile() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/csv");
+        intent.putExtra(Intent.EXTRA_TITLE, "xpress_scans.csv");
+        startActivityForResult(intent, CREATE_CSV_FILE_REQUEST);
+    }
+
+    private void shareCsvFile() {
+        if (!csvScanStore.hasStoredScans()) {
+            toast("No stored scans to share yet.");
+            return;
+        }
+        Uri csvUri = csvScanStore.getShareUri();
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/csv");
+        shareIntent.putExtra(Intent.EXTRA_STREAM, csvUri);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(shareIntent, "Share scan CSV"));
+    }
+
+    private void storeScanIfEnabled(String value) {
+        if (!prefs.getBoolean(STORE_SCANS_PREF, false)) return;
+        try {
+            csvScanStore.appendScan(value);
+        } catch (IOException e) {
+            toast("Could not store scan CSV.");
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == CREATE_CSV_FILE_REQUEST && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            try (OutputStream outputStream = getContentResolver().openOutputStream(data.getData())) {
+                if (outputStream == null) {
+                    toast("Could not open selected CSV file.");
+                    return;
+                }
+                csvScanStore.copyTo(outputStream);
+                toast("CSV file saved.");
+            } catch (IOException e) {
+                toast("Could not save CSV file.");
+            }
+        }
     }
 
     private void showInstructionsDialog() {
@@ -1229,6 +1345,7 @@ public class MainActivity extends ComponentActivity {
         triggerSuccessBeep();
         resetScreenTimeout();
         historyRepository.saveScan(value);
+        storeScanIfEnabled(value);
         runOnUiThread(() -> lastScanText.setText("Last scan: " + value));
 
         hidExecutor.execute(() -> {
