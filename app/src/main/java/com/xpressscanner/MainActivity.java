@@ -231,6 +231,19 @@ public class MainActivity extends ComponentActivity {
         titleBlock.addView(appSubtitle);
         brandRow.addView(titleBlock);
 
+        Button offlineScanButton = new Button(this);
+        offlineScanButton.setText("Scan Offline");
+        offlineScanButton.setAllCaps(false);
+        offlineScanButton.setTextSize(12);
+        offlineScanButton.setTextColor(Color.WHITE);
+        offlineScanButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        offlineScanButton.setBackground(createCardDrawable(color("btnSend"), 0, 18));
+        offlineScanButton.setPadding(dp(12), 0, dp(12), 0);
+        offlineScanButton.setOnClickListener(v -> startActivity(new android.content.Intent(this, OfflineScanActivity.class)));
+        LinearLayout.LayoutParams offlineScanParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36));
+        offlineScanParams.setMargins(0, 0, dp(8), 0);
+        brandRow.addView(offlineScanButton, offlineScanParams);
+
         // Info Button
         ImageButton infoButton = new ImageButton(this);
         infoButton.setImageResource(R.drawable.ic_info);
@@ -472,17 +485,6 @@ public class MainActivity extends ComponentActivity {
         historyRow.addView(bulkSendBtn);
 
         root.addView(historyRow);
-
-        Button offlineScanButton = new Button(this);
-        offlineScanButton.setText("Scan Offline");
-        offlineScanButton.setAllCaps(false);
-        offlineScanButton.setTextColor(Color.WHITE);
-        offlineScanButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        offlineScanButton.setBackground(createCardDrawable(color("btnSend"), 0, 12));
-        offlineScanButton.setOnClickListener(v -> startActivity(new android.content.Intent(this, OfflineScanActivity.class)));
-        LinearLayout.LayoutParams offlineScanParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
-        offlineScanParams.setMargins(0, dp(10), 0, 0);
-        root.addView(offlineScanButton, offlineScanParams);
 
         LinearLayout.LayoutParams manualLabelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         manualLabelParams.setMargins(dp(2), dp(8), 0, dp(8));

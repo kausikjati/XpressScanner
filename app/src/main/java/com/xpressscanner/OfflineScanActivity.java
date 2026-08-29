@@ -10,8 +10,11 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -20,6 +23,7 @@ import android.widget.Toast;
 import androidx.activity.ComponentActivity;
 import androidx.annotation.NonNull;
 import androidx.camera.core.CameraSelector;
+import androidx.camera.core.Camera;
 import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
@@ -60,6 +64,7 @@ public class OfflineScanActivity extends ComponentActivity {
 
     private OfflineCsvStore csvStore;
     private BarcodeScanner scanner;
+    private Camera camera;
     private PreviewView previewView;
     private BarcodeOverlayView overlayView;
     private LinearLayout pendingList;
@@ -68,6 +73,9 @@ public class OfflineScanActivity extends ComponentActivity {
     private Button startButton;
     private Button endButton;
     private boolean scanningEnabled = false;
+    private boolean autoScanMode = true;
+    private boolean cameraTouched = false;
+    private boolean isFlashOn = false;
     private String lastScan = "";
     private long lastScanAt = 0L;
     private OfflineCsvStore.CsvFile csvFileToSave;
@@ -96,12 +104,28 @@ public class OfflineScanActivity extends ComponentActivity {
             return WindowInsetsCompat.CONSUMED;
         });
 
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        Button backButton = new Button(this);
+        backButton.setText("Back");
+        backButton.setAllCaps(false);
+        backButton.setTextColor(MainActivity.color("textMain"));
+        backButton.setTextSize(13);
+        backButton.setBackground(card(MainActivity.color("card"), MainActivity.color("cardStroke"), 10));
+        backButton.setOnClickListener(v -> finish());
+        LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(dp(70), dp(40));
+        backParams.setMargins(0, 0, dp(10), 0);
+        titleRow.addView(backButton, backParams);
+
         TextView title = new TextView(this);
         title.setText("Offline CSV Scanner");
         title.setTextColor(MainActivity.color("textMain"));
         title.setTextSize(20);
         title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        root.addView(title);
+        titleRow.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        root.addView(titleRow);
 
         statusText = new TextView(this);
         statusText.setText("Tap Start Scan to collect AWB numbers without Bluetooth.");
@@ -116,9 +140,59 @@ public class OfflineScanActivity extends ComponentActivity {
         cameraParams.setMargins(0, 0, 0, dp(12));
         previewView = new PreviewView(this);
         previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
+        previewView.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    cameraTouched = true;
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    cameraTouched = false;
+                    return true;
+                default:
+                    return true;
+            }
+        });
         cameraFrame.addView(previewView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         overlayView = new BarcodeOverlayView(this);
         cameraFrame.addView(overlayView, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        Button modeButton = new Button(this);
+        modeButton.setText("AUTO");
+        modeButton.setTextSize(12);
+        modeButton.setTextColor(Color.WHITE);
+        modeButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        modeButton.setBackground(card(MainActivity.color("overlay"), 0, 24));
+        FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(46));
+        modeParams.gravity = Gravity.BOTTOM | Gravity.START;
+        modeParams.setMargins(dp(14), 0, 0, dp(14));
+        modeButton.setOnClickListener(v -> {
+            autoScanMode = !autoScanMode;
+            modeButton.setText(autoScanMode ? "AUTO" : "HOLD");
+            modeButton.setBackground(card(MainActivity.color(autoScanMode ? "overlay" : "overlayActive"), 0, 24));
+            toast(autoScanMode ? "Auto Scan Enabled" : "Tap and hold camera to scan");
+        });
+        cameraFrame.addView(modeButton, modeParams);
+
+        ImageButton flashButton = new ImageButton(this);
+        flashButton.setImageResource(R.drawable.ic_flash_off);
+        flashButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        flashButton.setPadding(dp(12), dp(12), dp(12), dp(12));
+        flashButton.setBackground(card(MainActivity.color("overlay"), 0, 24));
+        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(dp(46), dp(46));
+        flashParams.gravity = Gravity.BOTTOM | Gravity.END;
+        flashParams.setMargins(0, 0, dp(14), dp(14));
+        flashButton.setOnClickListener(v -> {
+            if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
+                isFlashOn = !isFlashOn;
+                camera.getCameraControl().enableTorch(isFlashOn);
+                flashButton.setImageResource(isFlashOn ? R.drawable.ic_flash : R.drawable.ic_flash_off);
+                flashButton.setBackground(card(MainActivity.color(isFlashOn ? "overlayActive" : "overlay"), 0, 24));
+            } else {
+                toast("Flash not supported.");
+            }
+        });
+        cameraFrame.addView(flashButton, flashParams);
         root.addView(cameraFrame, cameraParams);
 
         LinearLayout actionRow = new LinearLayout(this);
@@ -221,7 +295,7 @@ public class OfflineScanActivity extends ComponentActivity {
     }
 
     private void collectScan(String value) {
-        if (!scanningEnabled) return;
+        if (!scanningEnabled || (!autoScanMode && !cameraTouched)) return;
         long now = System.currentTimeMillis();
         if (value.equals(lastScan) && now - lastScanAt < DUPLICATE_SCAN_WINDOW_MS) return;
         lastScan = value;
@@ -329,7 +403,7 @@ public class OfflineScanActivity extends ComponentActivity {
                 ImageAnalysis analysis = new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build();
                 analysis.setAnalyzer(cameraExecutor, this::analyzeImage);
                 provider.unbindAll();
-                provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
+                camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
             } catch (Exception e) {
                 statusText.setText("Camera init failed.");
             }
