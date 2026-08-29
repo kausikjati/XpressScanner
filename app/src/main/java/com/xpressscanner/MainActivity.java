@@ -232,7 +232,7 @@ public class MainActivity extends ComponentActivity {
         brandRow.addView(titleBlock);
 
         Button offlineScanButton = new Button(this);
-        offlineScanButton.setText(" OFFLINE SCAN");
+        offlineScanButton.setText("OFFLINE SCAN");
         offlineScanButton.setAllCaps(false);
         offlineScanButton.setTextSize(12);
         offlineScanButton.setTextColor(color("accentIndigo"));
@@ -240,9 +240,11 @@ public class MainActivity extends ComponentActivity {
         offlineScanButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_offline_scan, 0, 0, 0);
         offlineScanButton.setCompoundDrawablePadding(dp(4));
         offlineScanButton.setGravity(Gravity.CENTER);
+        offlineScanButton.setMinWidth(0);
+        offlineScanButton.setMinHeight(0);
         offlineScanButton.setBackground(createCardDrawable(color("card"), color("cardStroke"), 28));
         offlineScanButton.setOnClickListener(v -> startActivity(new android.content.Intent(this, OfflineScanActivity.class)));
-        brandRow.addView(offlineScanButton, new LinearLayout.LayoutParams(dp(136), dp(46)));
+        brandRow.addView(offlineScanButton, new LinearLayout.LayoutParams(dp(130), dp(42)));
 
         root.addView(brandRow);
 
@@ -288,7 +290,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout btPanel = new LinearLayout(this);
         btPanel.setOrientation(LinearLayout.VERTICAL);
         btPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 22));
-        btPanel.setPadding(dp(14), dp(14), dp(14), dp(14));
+        btPanel.setPadding(dp(10), dp(10), dp(10), dp(10));
         btPanel.setElevation(dp(1));
 
         LinearLayout quickConnectRow = new LinearLayout(this);
@@ -315,6 +317,9 @@ public class MainActivity extends ComponentActivity {
         refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 0, 10));
         refreshButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_refresh, 0, 0, 0);
         refreshButton.setPadding(0, 0, 0, 0);
+        refreshButton.setGravity(Gravity.CENTER);
+        refreshButton.setMinWidth(0);
+        refreshButton.setMinHeight(0);
         refreshButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
@@ -327,17 +332,20 @@ public class MainActivity extends ComponentActivity {
         connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
         connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
         connectButton.setPadding(0, 0, 0, 0);
+        connectButton.setGravity(Gravity.CENTER);
+        connectButton.setMinWidth(0);
+        connectButton.setMinHeight(0);
         connectButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) toggleConnection();
         });
 
-        LinearLayout.LayoutParams deviceParams = new LinearLayout.LayoutParams(0, dp(66), 1f);
+        LinearLayout.LayoutParams deviceParams = new LinearLayout.LayoutParams(0, dp(54), 1f);
         deviceParams.setMargins(0, 0, dp(8), 0);
         quickConnectRow.addView(deviceButton, deviceParams);
-        LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(dp(54), dp(54));
+        LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(dp(46), dp(46));
         refreshParams.setMargins(0, 0, dp(8), 0);
         quickConnectRow.addView(refreshButton, refreshParams);
-        quickConnectRow.addView(connectButton, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        quickConnectRow.addView(connectButton, new LinearLayout.LayoutParams(dp(46), dp(46)));
         btPanel.addView(quickConnectRow);
         root.addView(btPanel);
 
@@ -380,8 +388,10 @@ public class MainActivity extends ComponentActivity {
         modeButton.setTextColor(Color.WHITE);
         modeButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         modeButton.setBackground(createCardDrawable(color("overlay"), 0, 24));
-        modeButton.setPadding(dp(18), 0, dp(18), 0);
-        FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(46));
+        modeButton.setPadding(dp(16), 0, dp(16), 0);
+        modeButton.setMinWidth(0);
+        modeButton.setMinHeight(0);
+        FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(42));
         modeParams.gravity = Gravity.BOTTOM | Gravity.START;
         modeParams.setMargins(dp(14), 0, 0, dp(14));
         modeButton.setLayoutParams(modeParams);
@@ -395,15 +405,18 @@ public class MainActivity extends ComponentActivity {
 
         // Floating Flash Toggle (Bottom-Right)
         Button flashButton = new Button(this);
-        flashButton.setText(" Torch");
+        flashButton.setText("Torch");
         flashButton.setTextSize(13);
         flashButton.setTextColor(Color.WHITE);
         flashButton.setAllCaps(false);
         flashButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_flash_off, 0, 0, 0);
         flashButton.setCompoundDrawablePadding(dp(6));
-        flashButton.setPadding(dp(15), 0, dp(15), 0);
+        flashButton.setPadding(dp(14), 0, dp(14), 0);
+        flashButton.setGravity(Gravity.CENTER);
+        flashButton.setMinWidth(0);
+        flashButton.setMinHeight(0);
         flashButton.setBackground(createCardDrawable(color("overlay"), 0, 24));
-        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(46));
+        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(42));
         flashParams.gravity = Gravity.BOTTOM | Gravity.END;
         flashParams.setMargins(0, 0, dp(14), dp(14));
         flashButton.setLayoutParams(flashParams);
@@ -433,7 +446,7 @@ public class MainActivity extends ComponentActivity {
         historyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
         historyBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 18));
         historyBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
-        LinearLayout.LayoutParams historyBtnParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        LinearLayout.LayoutParams historyBtnParams = new LinearLayout.LayoutParams(dp(44), dp(44));
         historyBtnParams.setMargins(0, 0, dp(10), 0);
         historyBtn.setLayoutParams(historyBtnParams);
         historyBtn.setOnClickListener(v -> showHistoryDialog());
@@ -451,7 +464,7 @@ public class MainActivity extends ComponentActivity {
         lastScanText.setBackground(createCardDrawable(color("card"), color("cardStroke"), 18));
 
         LinearLayout.LayoutParams lastScanParams =
-                new LinearLayout.LayoutParams(0, dp(48), 1f);
+                new LinearLayout.LayoutParams(0, dp(44), 1f);
         historyRow.addView(lastScanText, lastScanParams);
 
         // Bulk Auto Sender Button
@@ -461,7 +474,7 @@ public class MainActivity extends ComponentActivity {
         bulkSendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
         bulkSendBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 18));
         bulkSendBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
-        LinearLayout.LayoutParams bulkBtnParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+        LinearLayout.LayoutParams bulkBtnParams = new LinearLayout.LayoutParams(dp(44), dp(44));
         bulkBtnParams.setMargins(dp(10), 0, 0, 0);
         bulkSendBtn.setLayoutParams(bulkBtnParams);
         bulkSendBtn.setOnClickListener(v -> showBulkSendDialog());
@@ -480,7 +493,7 @@ public class MainActivity extends ComponentActivity {
         manualPanel.setOrientation(LinearLayout.HORIZONTAL);
         manualPanel.setGravity(Gravity.CENTER_VERTICAL);
         manualPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 22));
-        manualPanel.setPadding(dp(14), dp(14), dp(14), dp(14));
+        manualPanel.setPadding(dp(10), dp(10), dp(10), dp(10));
         manualPanel.setElevation(dp(1));
 
         manualInput = new EditText(this);
@@ -507,13 +520,13 @@ public class MainActivity extends ComponentActivity {
         sendButton.setImageResource(R.drawable.ic_send);
         sendButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
         sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 16));
-        sendButton.setPadding(dp(14), dp(10), dp(14), dp(10));
+        sendButton.setPadding(dp(12), dp(10), dp(12), dp(10));
         sendButton.setOnClickListener(v -> sendManualValue());
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         inputParams.setMargins(0, 0, dp(10), 0);
         manualPanel.addView(manualInput, inputParams);
-        manualPanel.addView(sendButton, new LinearLayout.LayoutParams(dp(60), dp(52)));
+        manualPanel.addView(sendButton, new LinearLayout.LayoutParams(dp(56), dp(48)));
         root.addView(manualPanel);
 
         setContentView(root);
