@@ -288,13 +288,17 @@ public class MainActivity extends ComponentActivity {
         LinearLayout btPanel = new LinearLayout(this);
         btPanel.setOrientation(LinearLayout.VERTICAL);
         btPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 22));
-        btPanel.setPadding(dp(18), dp(18), dp(18), dp(18));
+        btPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
         btPanel.setElevation(dp(1));
+
+        LinearLayout quickConnectRow = new LinearLayout(this);
+        quickConnectRow.setOrientation(LinearLayout.HORIZONTAL);
+        quickConnectRow.setGravity(Gravity.CENTER_VERTICAL);
 
         deviceButton = new Button(this);
         deviceButton.setText("  Select Bluetooth Device");
         deviceButton.setAllCaps(false);
-        deviceButton.setTextSize(18);
+        deviceButton.setTextSize(17);
         deviceButton.setTextColor(color("textMain"));
         deviceButton.setBackground(createCardDrawable(color("card"), 0, 12));
         deviceButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_bluetooth, 0, 0, 0);
@@ -304,59 +308,43 @@ public class MainActivity extends ComponentActivity {
         deviceButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
-        btPanel.addView(deviceButton, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(58)));
-
-        LinearLayout actionRow = new LinearLayout(this);
-        actionRow.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        rowParams.setMargins(0, dp(12), 0, 0);
-        actionRow.setLayoutParams(rowParams);
-
         Button refreshButton = new Button(this);
-        refreshButton.setText(" Refresh");
+        refreshButton.setText("");
         refreshButton.setAllCaps(false);
         refreshButton.setTextColor(color("textMain"));
         refreshButton.setBackground(createCardDrawable(color("btnRefresh"), 0, 10));
         refreshButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_refresh, 0, 0, 0);
-        refreshButton.setCompoundDrawablePadding(dp(8));
-        refreshButton.setPaddingRelative(dp(14), 0, dp(14), 0);
+        refreshButton.setPadding(0, 0, 0, 0);
         refreshButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
 
         connectButton = new Button(this);
-        connectButton.setText(" Connect");
+        connectButton.setText("");
         connectButton.setAllCaps(false);
         connectButton.setTextColor(Color.WHITE);
         connectButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
         connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
-        connectButton.setCompoundDrawablePadding(dp(8));
-        connectButton.setPaddingRelative(dp(14), 0, dp(14), 0);
+        connectButton.setPadding(0, 0, 0, 0);
         connectButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) toggleConnection();
         });
 
-        LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(0, dp(46), 1);
-        p1.setMargins(0, 0, dp(8), 0);
-        LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(0, dp(46), 1);
-        p2.setMargins(dp(8), 0, 0, 0);
-
-        actionRow.addView(refreshButton, p1);
-        actionRow.addView(connectButton, p2);
-        btPanel.addView(actionRow);
+        LinearLayout.LayoutParams deviceParams = new LinearLayout.LayoutParams(0, dp(82), 1f);
+        deviceParams.setMargins(0, 0, dp(10), 0);
+        quickConnectRow.addView(deviceButton, deviceParams);
+        LinearLayout.LayoutParams refreshParams = new LinearLayout.LayoutParams(dp(66), dp(66));
+        refreshParams.setMargins(0, 0, dp(10), 0);
+        quickConnectRow.addView(refreshButton, refreshParams);
+        quickConnectRow.addView(connectButton, new LinearLayout.LayoutParams(dp(66), dp(66)));
+        btPanel.addView(quickConnectRow);
         root.addView(btPanel);
-
-        LinearLayout.LayoutParams scannerLabelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        scannerLabelParams.setMargins(dp(2), dp(14), 0, dp(8));
-        TextView scannerLabel = sectionLabel("SCANNER");
-        scannerLabel.setLayoutParams(scannerLabelParams);
-        root.addView(scannerLabel);
 
         // Viewport / Camera Frame
         FrameLayout cameraContainer = new FrameLayout(this);
         LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        cameraContainerParams.setMargins(0, 0, 0, dp(18));
+        cameraContainerParams.setMargins(0, dp(18), 0, dp(14));
         cameraContainer.setLayoutParams(cameraContainerParams);
 
         cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("cardStroke"), 28));
@@ -433,6 +421,23 @@ public class MainActivity extends ComponentActivity {
 
         root.addView(cameraContainer);
 
+        LinearLayout scanDataHeader = new LinearLayout(this);
+        scanDataHeader.setGravity(Gravity.CENTER_VERTICAL);
+        View leftDivider = new View(this);
+        leftDivider.setBackgroundColor(color("cardStroke"));
+        scanDataHeader.addView(leftDivider, new LinearLayout.LayoutParams(0, dp(1), 1f));
+        TextView scanDataLabel = sectionLabel("SCAN DATA");
+        scanDataLabel.setTextSize(13);
+        LinearLayout.LayoutParams scanDataLabelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        scanDataLabelParams.setMargins(dp(14), 0, dp(14), 0);
+        scanDataHeader.addView(scanDataLabel, scanDataLabelParams);
+        View rightDivider = new View(this);
+        rightDivider.setBackgroundColor(color("cardStroke"));
+        scanDataHeader.addView(rightDivider, new LinearLayout.LayoutParams(0, dp(1), 1f));
+        LinearLayout.LayoutParams scanDataHeaderParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(24));
+        scanDataHeaderParams.setMargins(dp(16), 0, dp(16), dp(2));
+        root.addView(scanDataHeader, scanDataHeaderParams);
+
         // History Row
         LinearLayout historyRow = new LinearLayout(this);
         historyRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -443,9 +448,9 @@ public class MainActivity extends ComponentActivity {
         historyBtn.setImageResource(R.drawable.ic_history);
         historyBtn.setColorFilter(color("textSub"));
         historyBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        historyBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
+        historyBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 18));
         historyBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
-        LinearLayout.LayoutParams historyBtnParams = new LinearLayout.LayoutParams(dp(40), dp(40));
+        LinearLayout.LayoutParams historyBtnParams = new LinearLayout.LayoutParams(dp(58), dp(58));
         historyBtnParams.setMargins(0, 0, dp(10), 0);
         historyBtn.setLayoutParams(historyBtnParams);
         historyBtn.setOnClickListener(v -> showHistoryDialog());
@@ -459,9 +464,11 @@ public class MainActivity extends ComponentActivity {
         lastScanText.setPadding(dp(12), 0, 0, 0);
         lastScanText.setSingleLine(true);
         lastScanText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        lastScanText.setGravity(Gravity.CENTER_VERTICAL);
+        lastScanText.setBackground(createCardDrawable(color("card"), color("cardStroke"), 18));
 
         LinearLayout.LayoutParams lastScanParams =
-                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                new LinearLayout.LayoutParams(0, dp(58), 1f);
         historyRow.addView(lastScanText, lastScanParams);
 
         // Bulk Auto Sender Button
@@ -469,9 +476,9 @@ public class MainActivity extends ComponentActivity {
         bulkSendBtn.setImageResource(android.R.drawable.ic_menu_agenda);
         bulkSendBtn.setColorFilter(color("textSub"));
         bulkSendBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        bulkSendBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
+        bulkSendBtn.setBackground(createCardDrawable(color("card"), color("cardStroke"), 18));
         bulkSendBtn.setPadding(dp(10), dp(10), dp(10), dp(10));
-        LinearLayout.LayoutParams bulkBtnParams = new LinearLayout.LayoutParams(dp(40), dp(40));
+        LinearLayout.LayoutParams bulkBtnParams = new LinearLayout.LayoutParams(dp(58), dp(58));
         bulkBtnParams.setMargins(dp(10), 0, 0, 0);
         bulkSendBtn.setLayoutParams(bulkBtnParams);
         bulkSendBtn.setOnClickListener(v -> showBulkSendDialog());
@@ -480,7 +487,7 @@ public class MainActivity extends ComponentActivity {
         root.addView(historyRow);
 
         LinearLayout.LayoutParams manualLabelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        manualLabelParams.setMargins(dp(2), dp(8), 0, dp(8));
+        manualLabelParams.setMargins(dp(2), dp(14), 0, dp(8));
         TextView manualLabel = sectionLabel("MANUAL ENTRY");
         manualLabel.setLayoutParams(manualLabelParams);
         root.addView(manualLabel);
@@ -489,8 +496,8 @@ public class MainActivity extends ComponentActivity {
         LinearLayout manualPanel = new LinearLayout(this);
         manualPanel.setOrientation(LinearLayout.HORIZONTAL);
         manualPanel.setGravity(Gravity.CENTER_VERTICAL);
-        manualPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 14));
-        manualPanel.setPadding(dp(12), dp(12), dp(12), dp(12));
+        manualPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 22));
+        manualPanel.setPadding(dp(18), dp(18), dp(18), dp(18));
         manualPanel.setElevation(dp(1));
 
         manualInput = new EditText(this);
@@ -498,11 +505,11 @@ public class MainActivity extends ComponentActivity {
         manualInput.setHint("Enter value manually");
         manualInput.setHintTextColor(color("textSub"));
         manualInput.setTextColor(color("textMain"));
-        manualInput.setTextSize(15);
+        manualInput.setTextSize(18);
         manualInput.setImeOptions(EditorInfo.IME_ACTION_SEND);
 
-        manualInput.setBackground(createCardDrawable(color("inputBg"), color("cardStroke"), 10));
-        manualInput.setPadding(dp(12), dp(10), dp(12), dp(10));
+        manualInput.setBackground(createCardDrawable(color("inputBg"), 0, 16));
+        manualInput.setPadding(dp(18), dp(10), dp(18), dp(10));
 
         manualInput.setOnEditorActionListener((v, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -516,14 +523,14 @@ public class MainActivity extends ComponentActivity {
         ImageButton sendButton = new ImageButton(this);
         sendButton.setImageResource(R.drawable.ic_send);
         sendButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 10));
-        sendButton.setPadding(dp(14), dp(12), dp(14), dp(12));
+        sendButton.setBackground(createCardDrawable(color("btnSend"), 0, 16));
+        sendButton.setPadding(dp(18), dp(14), dp(18), dp(14));
         sendButton.setOnClickListener(v -> sendManualValue());
 
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         inputParams.setMargins(0, 0, dp(10), 0);
         manualPanel.addView(manualInput, inputParams);
-        manualPanel.addView(sendButton, new LinearLayout.LayoutParams(dp(50), dp(44)));
+        manualPanel.addView(sendButton, new LinearLayout.LayoutParams(dp(76), dp(64)));
         root.addView(manualPanel);
 
         setContentView(root);
@@ -955,7 +962,8 @@ public class MainActivity extends ComponentActivity {
                 updateStatusUI("Connected to " + name, "pillConnected");
                 runOnUiThread(() -> {
                     connectButton.setBackground(createCardDrawable(color("btnDisconnect"), 0, 10));
-                    connectButton.setText(" Disconnect");
+                    connectButton.setText("");
+                    connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link_off, 0, 0, 0);
                 });
             } else {
                 hidConnectedDevice = null;
@@ -964,7 +972,8 @@ public class MainActivity extends ComponentActivity {
                 }
                 runOnUiThread(() -> {
                     connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
-                    connectButton.setText(" Connect");
+                    connectButton.setText("");
+                    connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
                 });
             }
         }
@@ -1021,7 +1030,8 @@ public class MainActivity extends ComponentActivity {
         runOnUiThread(() -> {
             deviceButton.setText("Bluetooth is off");
             connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
-            connectButton.setText(" Connect");
+            connectButton.setText("");
+            connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
         });
         toast("Your Bluetooth is off. Turn it on to connect.");
     }
@@ -1285,7 +1295,8 @@ public class MainActivity extends ComponentActivity {
         hidConnectedDevice = null;
         runOnUiThread(() -> {
             connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
-            connectButton.setText(" Connect");
+            connectButton.setText("");
+            connectButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_link, 0, 0, 0);
             updateStatusUI(CONNECTION_LOST_MESSAGE, "btnDisconnect");
             toast("Bluetooth connection lost. Disconnect/reconnect Windows if needed.");
         });
