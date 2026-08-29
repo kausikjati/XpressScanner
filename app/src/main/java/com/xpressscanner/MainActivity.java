@@ -193,7 +193,7 @@ public class MainActivity extends ComponentActivity {
 
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(dp(16) + insets.left, dp(20) + insets.top, dp(16) + insets.right, dp(20) + insets.bottom);
+            v.setPadding(dp(20) + insets.left, dp(18) + insets.top, dp(20) + insets.right, dp(18) + insets.bottom);
             return WindowInsetsCompat.CONSUMED;
         });
 
@@ -202,15 +202,15 @@ public class MainActivity extends ComponentActivity {
         brandRow.setOrientation(LinearLayout.HORIZONTAL);
         brandRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        brandParams.setMargins(0, 0, 0, dp(10));
+        brandParams.setMargins(0, 0, 0, dp(16));
         brandRow.setLayoutParams(brandParams);
 
         ImageView logoView = new ImageView(this);
         logoView.setImageResource(R.drawable.ic_scan_logo);
-        logoView.setBackground(createCardDrawable(color("card"), color("cardStroke"), 10));
-        logoView.setPadding(dp(6), dp(6), dp(6), dp(6));
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(36), dp(36));
-        logoParams.setMargins(0, 0, dp(10), 0);
+        logoView.setPadding(0, 0, 0, 0);
+        logoView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(54), dp(54));
+        logoParams.setMargins(0, 0, dp(12), 0);
         brandRow.addView(logoView, logoParams);
 
         LinearLayout titleBlock = new LinearLayout(this);
@@ -219,28 +219,30 @@ public class MainActivity extends ComponentActivity {
 
         TextView appTitle = new TextView(this);
         appTitle.setText("Xpress Scanner");
-        appTitle.setTextSize(17);
+        appTitle.setTextSize(24);
         appTitle.setTextColor(color("textMain"));
         appTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         titleBlock.addView(appTitle);
 
         TextView appSubtitle = new TextView(this);
         appSubtitle.setText("Bluetooth barcode wedge");
-        appSubtitle.setTextSize(12);
+        appSubtitle.setTextSize(15);
         appSubtitle.setTextColor(color("textSub"));
         titleBlock.addView(appSubtitle);
         brandRow.addView(titleBlock);
 
-        // Info Button
-        ImageButton infoButton = new ImageButton(this);
-        infoButton.setImageResource(R.drawable.ic_info);
-        infoButton.setBackground(createCardDrawable(Color.WHITE, 0, 18));
-        infoButton.setPadding(dp(9), dp(9), dp(9), dp(9));
-        infoButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        infoButton.setElevation(dp(2));
-        infoButton.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
-        infoButton.setOnClickListener(v -> showInstructionsDialog());
-        brandRow.addView(infoButton);
+        Button offlineScanButton = new Button(this);
+        offlineScanButton.setText(" OFFLINE SCAN");
+        offlineScanButton.setAllCaps(false);
+        offlineScanButton.setTextSize(13);
+        offlineScanButton.setTextColor(color("accentIndigo"));
+        offlineScanButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        offlineScanButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_offline_scan, 0, 0, 0);
+        offlineScanButton.setCompoundDrawablePadding(dp(6));
+        offlineScanButton.setGravity(Gravity.CENTER);
+        offlineScanButton.setBackground(createCardDrawable(color("card"), color("cardStroke"), 28));
+        offlineScanButton.setOnClickListener(v -> startActivity(new android.content.Intent(this, OfflineScanActivity.class)));
+        brandRow.addView(offlineScanButton, new LinearLayout.LayoutParams(dp(152), dp(56)));
 
         root.addView(brandRow);
 
@@ -249,14 +251,14 @@ public class MainActivity extends ComponentActivity {
         headerRow.setOrientation(LinearLayout.HORIZONTAL);
         headerRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        headerParams.setMargins(0, 0, 0, dp(12));
+        headerParams.setMargins(0, 0, 0, dp(22));
         headerRow.setLayoutParams(headerParams);
 
         statusCard = new LinearLayout(this);
         statusCard.setOrientation(LinearLayout.HORIZONTAL);
         statusCard.setGravity(Gravity.CENTER);
-        statusCard.setBackground(createCardDrawable(color("pillDefault"), 0, 24));
-        statusCard.setPadding(dp(16), dp(10), dp(16), dp(10));
+        statusCard.setBackground(createCardDrawable(color("pillDefault"), color("cardStroke"), 28));
+        statusCard.setPadding(dp(18), dp(14), dp(18), dp(14));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         statusCard.setLayoutParams(cardParams);
 
@@ -271,7 +273,7 @@ public class MainActivity extends ComponentActivity {
 
         statusText = new TextView(this);
         statusText.setText("Initializing system...");
-        statusText.setTextSize(14);
+        statusText.setTextSize(17);
         statusText.setTextColor(color("textMain"));
         statusText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         statusText.setGravity(Gravity.CENTER);
@@ -280,21 +282,21 @@ public class MainActivity extends ComponentActivity {
 
         root.addView(headerRow);
 
-        root.addView(sectionLabel("CONNECTION"));
+        root.addView(sectionLabel("QUICK CONNECT"));
 
         // Bluetooth Panel
         LinearLayout btPanel = new LinearLayout(this);
         btPanel.setOrientation(LinearLayout.VERTICAL);
-        btPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 14));
-        btPanel.setPadding(dp(16), dp(16), dp(16), dp(16));
+        btPanel.setBackground(createCardDrawable(color("card"), color("cardStroke"), 22));
+        btPanel.setPadding(dp(18), dp(18), dp(18), dp(18));
         btPanel.setElevation(dp(1));
 
         deviceButton = new Button(this);
         deviceButton.setText("  Select Bluetooth Device");
         deviceButton.setAllCaps(false);
-        deviceButton.setTextSize(15);
+        deviceButton.setTextSize(18);
         deviceButton.setTextColor(color("textMain"));
-        deviceButton.setBackground(createCardDrawable(color("bg"), color("cardStroke"), 10));
+        deviceButton.setBackground(createCardDrawable(color("card"), 0, 12));
         deviceButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_bluetooth, 0, 0, 0);
         deviceButton.setCompoundDrawablePadding(dp(8));
         deviceButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
@@ -302,7 +304,7 @@ public class MainActivity extends ComponentActivity {
         deviceButton.setOnClickListener(v -> {
             if (requestBluetoothPermissionIfNeeded()) loadPairedDevices();
         });
-        btPanel.addView(deviceButton, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        btPanel.addView(deviceButton, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(58)));
 
         LinearLayout actionRow = new LinearLayout(this);
         actionRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -354,10 +356,10 @@ public class MainActivity extends ComponentActivity {
         // Viewport / Camera Frame
         FrameLayout cameraContainer = new FrameLayout(this);
         LinearLayout.LayoutParams cameraContainerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
-        cameraContainerParams.setMargins(0, 0, 0, dp(16));
+        cameraContainerParams.setMargins(0, 0, 0, dp(18));
         cameraContainer.setLayoutParams(cameraContainerParams);
 
-        cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("cardStroke"), 20));
+        cameraContainer.setBackground(createCardDrawable(Color.BLACK, color("cardStroke"), 28));
         cameraContainer.setClipToOutline(true);
         cameraContainer.setElevation(dp(2));
 
@@ -386,12 +388,12 @@ public class MainActivity extends ComponentActivity {
         // Scan Mode Toggle Button (Bottom-Left)
         Button modeButton = new Button(this);
         modeButton.setText("AUTO");
-        modeButton.setTextSize(12);
+        modeButton.setTextSize(15);
         modeButton.setTextColor(Color.WHITE);
         modeButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         modeButton.setBackground(createCardDrawable(color("overlay"), 0, 24));
-        modeButton.setPadding(dp(12), 0, dp(12), 0);
-        FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(46));
+        modeButton.setPadding(dp(22), 0, dp(22), 0);
+        FrameLayout.LayoutParams modeParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(54));
         modeParams.gravity = Gravity.BOTTOM | Gravity.START;
         modeParams.setMargins(dp(14), 0, 0, dp(14));
         modeButton.setLayoutParams(modeParams);
@@ -404,12 +406,16 @@ public class MainActivity extends ComponentActivity {
         cameraContainer.addView(modeButton);
 
         // Floating Flash Toggle (Bottom-Right)
-        ImageButton flashButton = new ImageButton(this);
-        flashButton.setImageResource(R.drawable.ic_flash_off);
-        flashButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        flashButton.setPadding(dp(12), dp(12), dp(12), dp(12));
+        Button flashButton = new Button(this);
+        flashButton.setText(" Torch");
+        flashButton.setTextSize(15);
+        flashButton.setTextColor(Color.WHITE);
+        flashButton.setAllCaps(false);
+        flashButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_flash_off, 0, 0, 0);
+        flashButton.setCompoundDrawablePadding(dp(6));
+        flashButton.setPadding(dp(18), 0, dp(18), 0);
         flashButton.setBackground(createCardDrawable(color("overlay"), 0, 24));
-        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(dp(46), dp(46));
+        FrameLayout.LayoutParams flashParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(54));
         flashParams.gravity = Gravity.BOTTOM | Gravity.END;
         flashParams.setMargins(0, 0, dp(14), dp(14));
         flashButton.setLayoutParams(flashParams);
@@ -417,7 +423,7 @@ public class MainActivity extends ComponentActivity {
             if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
                 isFlashOn = !isFlashOn;
                 camera.getCameraControl().enableTorch(isFlashOn);
-                flashButton.setImageResource(isFlashOn ? R.drawable.ic_flash : R.drawable.ic_flash_off);
+                flashButton.setCompoundDrawablesWithIntrinsicBounds(isFlashOn ? R.drawable.ic_flash : R.drawable.ic_flash_off, 0, 0, 0);
                 flashButton.setBackground(createCardDrawable(color(isFlashOn ? "overlayActive" : "overlay"), 0, 24));
             } else {
                 toast("Flash not supported.");
@@ -431,7 +437,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout historyRow = new LinearLayout(this);
         historyRow.setOrientation(LinearLayout.HORIZONTAL);
         historyRow.setGravity(Gravity.CENTER_VERTICAL);
-        historyRow.setPadding(dp(8), 0, dp(8), 0);
+        historyRow.setPadding(0, 0, 0, 0);
 
         ImageButton historyBtn = new ImageButton(this);
         historyBtn.setImageResource(R.drawable.ic_history);
@@ -447,8 +453,8 @@ public class MainActivity extends ComponentActivity {
 
         lastScanText = new TextView(this);
         lastScanText.setText("Last scan: Ready for data...");
-        lastScanText.setTextColor(color("accentGreen"));
-        lastScanText.setTextSize(12);
+        lastScanText.setTextColor(color("textSub"));
+        lastScanText.setTextSize(15);
         lastScanText.setTypeface(android.graphics.Typeface.MONOSPACE);
         lastScanText.setPadding(dp(12), 0, 0, 0);
         lastScanText.setSingleLine(true);
@@ -472,17 +478,6 @@ public class MainActivity extends ComponentActivity {
         historyRow.addView(bulkSendBtn);
 
         root.addView(historyRow);
-
-        Button offlineScanButton = new Button(this);
-        offlineScanButton.setText("Scan Offline");
-        offlineScanButton.setAllCaps(false);
-        offlineScanButton.setTextColor(Color.WHITE);
-        offlineScanButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        offlineScanButton.setBackground(createCardDrawable(color("btnSend"), 0, 12));
-        offlineScanButton.setOnClickListener(v -> startActivity(new android.content.Intent(this, OfflineScanActivity.class)));
-        LinearLayout.LayoutParams offlineScanParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
-        offlineScanParams.setMargins(0, dp(10), 0, 0);
-        root.addView(offlineScanButton, offlineScanParams);
 
         LinearLayout.LayoutParams manualLabelParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         manualLabelParams.setMargins(dp(2), dp(8), 0, dp(8));
