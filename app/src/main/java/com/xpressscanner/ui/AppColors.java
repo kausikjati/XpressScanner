@@ -7,24 +7,24 @@ public final class AppColors {
 
     public static int color(String key) {
         switch (key) {
-            case "bg": return Color.parseColor("#0B0F1A");
-            case "card": return Color.parseColor("#141B2E");
-            case "cardStroke": return Color.parseColor("#232C42");
-            case "pillConnected": return Color.parseColor("#4338CA");
-            case "pillDefault": return Color.parseColor("#1C2438");
-            case "textMain": return Color.parseColor("#F1F5F9");
-            case "textSub": return Color.parseColor("#8B93A7");
-            case "textLabel": return Color.parseColor("#5B6478");
-            case "btnRefresh": return Color.parseColor("#2A3350");
-            case "btnDisconnect": return Color.parseColor("#DC2626");
-            case "btnConnect": return Color.parseColor("#15803D");
-            case "inputBg": return Color.parseColor("#0B0F1A");
-            case "btnSend": return Color.parseColor("#4F46E5");
-            case "accentGreen": return Color.parseColor("#2DD4BF");
-            case "accentIndigo": return Color.parseColor("#6366F1");
-            case "accentRed": return Color.parseColor("#F87171");
-            case "overlay": return Color.parseColor("#99000000");
-            case "overlayActive": return Color.parseColor("#CC1D4ED8");
+            case "bg": return Color.parseColor("#1F2026");
+            case "card": return Color.parseColor("#30323B");
+            case "cardStroke": return Color.parseColor("#4A4D58");
+            case "pillConnected": return Color.parseColor("#31343D");
+            case "pillDefault": return Color.parseColor("#30323A");
+            case "textMain": return Color.parseColor("#F2F2F5");
+            case "textSub": return Color.parseColor("#B4B5BD");
+            case "textLabel": return Color.parseColor("#A5A6AF");
+            case "btnRefresh": return Color.parseColor("#343741");
+            case "btnDisconnect": return Color.parseColor("#56373B");
+            case "btnConnect": return Color.parseColor("#2E6F5B");
+            case "inputBg": return Color.parseColor("#202126");
+            case "btnSend": return Color.parseColor("#3C67C8");
+            case "accentGreen": return Color.parseColor("#38C68B");
+            case "accentIndigo": return Color.parseColor("#7196EA");
+            case "accentRed": return Color.parseColor("#E28B91");
+            case "overlay": return Color.parseColor("#E82E3038");
+            case "overlayActive": return Color.parseColor("#E83C67C8");
             default: return Color.WHITE;
         }
     }
