@@ -209,8 +209,8 @@ public class MainActivity extends ComponentActivity {
         logoView.setImageResource(R.drawable.ic_scan_logo);
         logoView.setPadding(0, 0, 0, 0);
         logoView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(44), dp(44));
-        logoParams.setMargins(0, 0, dp(10), 0);
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(36), dp(36));
+        logoParams.setMargins(0, 0, dp(8), 0);
         brandRow.addView(logoView, logoParams);
 
         LinearLayout titleBlock = new LinearLayout(this);
@@ -219,32 +219,40 @@ public class MainActivity extends ComponentActivity {
 
         TextView appTitle = new TextView(this);
         appTitle.setText("Xpress Scanner");
-        appTitle.setTextSize(20);
+        appTitle.setTextSize(18);
         appTitle.setTextColor(color("textMain"));
         appTitle.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        appTitle.setSingleLine(true);
+        appTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titleBlock.addView(appTitle);
 
         TextView appSubtitle = new TextView(this);
         appSubtitle.setText("Bluetooth barcode wedge");
-        appSubtitle.setTextSize(13);
+        appSubtitle.setTextSize(12);
         appSubtitle.setTextColor(color("textSub"));
+        appSubtitle.setSingleLine(true);
+        appSubtitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titleBlock.addView(appSubtitle);
         brandRow.addView(titleBlock);
 
-        Button offlineScanButton = new Button(this);
-        offlineScanButton.setText("OFFLINE SCAN");
-        offlineScanButton.setAllCaps(false);
-        offlineScanButton.setTextSize(12);
-        offlineScanButton.setTextColor(color("accentIndigo"));
-        offlineScanButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-        offlineScanButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_offline_scan, 0, 0, 0);
-        offlineScanButton.setCompoundDrawablePadding(dp(4));
+        LinearLayout offlineScanButton = new LinearLayout(this);
+        offlineScanButton.setOrientation(LinearLayout.HORIZONTAL);
         offlineScanButton.setGravity(Gravity.CENTER);
-        offlineScanButton.setMinWidth(0);
-        offlineScanButton.setMinHeight(0);
         offlineScanButton.setBackground(createCardDrawable(color("card"), color("cardStroke"), 28));
         offlineScanButton.setOnClickListener(v -> startActivity(new android.content.Intent(this, OfflineScanActivity.class)));
-        brandRow.addView(offlineScanButton, new LinearLayout.LayoutParams(dp(130), dp(42)));
+        ImageView offlineScanIcon = new ImageView(this);
+        offlineScanIcon.setImageResource(R.drawable.ic_offline_scan);
+        offlineScanIcon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        LinearLayout.LayoutParams offlineIconParams = new LinearLayout.LayoutParams(dp(22), dp(22));
+        offlineIconParams.setMargins(0, 0, dp(6), 0);
+        offlineScanButton.addView(offlineScanIcon, offlineIconParams);
+        TextView offlineScanText = new TextView(this);
+        offlineScanText.setText("OFFLINE SCAN");
+        offlineScanText.setTextSize(12);
+        offlineScanText.setTextColor(color("accentIndigo"));
+        offlineScanText.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        offlineScanButton.addView(offlineScanText);
+        brandRow.addView(offlineScanButton, new LinearLayout.LayoutParams(dp(120), dp(42)));
 
         root.addView(brandRow);
 
@@ -298,7 +306,7 @@ public class MainActivity extends ComponentActivity {
         quickConnectRow.setGravity(Gravity.CENTER_VERTICAL);
 
         deviceButton = new Button(this);
-        deviceButton.setText("  Select Bluetooth Device");
+        deviceButton.setText("Select Bluetooth Device");
         deviceButton.setAllCaps(false);
         deviceButton.setTextSize(15);
         deviceButton.setTextColor(color("textMain"));
@@ -941,7 +949,7 @@ public class MainActivity extends ComponentActivity {
                 if (device.getAddress().equals(savedMac)) {
                     selectedDevice = device;
                     String name = device.getName() == null ? "Unknown Machine" : device.getName();
-                    runOnUiThread(() -> deviceButton.setText("  " + name));
+                    runOnUiThread(() -> deviceButton.setText(name));
                     break;
                 }
             }
@@ -1101,7 +1109,7 @@ public class MainActivity extends ComponentActivity {
                     selectedDevice = pairedDevices.get(which);
                     prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
                     String name = selectedDevice.getName() == null ? "Unknown Machine" : selectedDevice.getName();
-                    deviceButton.setText("  " + name);
+                    deviceButton.setText(name);
                 }).show();
     }
 
