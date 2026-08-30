@@ -317,7 +317,7 @@ public class OfflineScanActivity extends ComponentActivity {
 
         // Floating Flash Toggle (Bottom-Right)
         ImageButton flashButton = new ImageButton(this);
-        flashButton.setImageResource(android.R.drawable.ic_menu_camera); // Flash Icon fallback
+        flashButton.setImageResource(R.drawable.ic_flash_off); // Flash Icon fallback
         flashButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
         flashButton.setPadding(dp(10), dp(10), dp(10), dp(10));
         flashButton.setBackground(createCardDrawable(MainActivity.color("overlay"), 0, 24));
@@ -329,7 +329,9 @@ public class OfflineScanActivity extends ComponentActivity {
             if (camera != null && camera.getCameraInfo().hasFlashUnit()) {
                 isFlashOn = !isFlashOn;
                 camera.getCameraControl().enableTorch(isFlashOn);
+                flashButton.setImageResource(isFlashOn ? R.drawable.ic_flash : R.drawable.ic_flash_off);
                 flashButton.setBackground(createCardDrawable(MainActivity.color(isFlashOn ? "overlayActive" : "overlay"), 0, 24));
+
             }
         });
         cameraContainer.addView(flashButton);

@@ -144,6 +144,12 @@ public class MainActivity extends ComponentActivity {
     @Override
     protected void onResume() {
         super.onResume();
+
+        // FIX: Re-bind the camera whenever the user returns to MainActivity
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            startCamera();
+        }
+
         if (hasBluetoothPermission()) {
             restoreLastDevice();
             if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
@@ -273,7 +279,7 @@ public class MainActivity extends ComponentActivity {
         statusCard.setOrientation(LinearLayout.HORIZONTAL);
         statusCard.setGravity(Gravity.CENTER);
         statusCard.setBackground(createCardDrawable(color("pillDefault"), color("cardStroke"), 28));
-        statusCard.setPadding(dp(16), dp(11), dp(16), dp(11));
+        statusCard.setPadding(dp(16), dp(11), dp(16), dp(12));
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         statusCard.setLayoutParams(cardParams);
 
@@ -446,7 +452,7 @@ public class MainActivity extends ComponentActivity {
         historyRow.addView(historyBtn);
 
         lastScanText = new TextView(this);
-        lastScanText.setText("Last scan: Ready for data...");
+        lastScanText.setText("Ready for data...");
         lastScanText.setTextColor(color("textSub"));
         lastScanText.setTextSize(13);
         lastScanText.setTypeface(android.graphics.Typeface.MONOSPACE);
@@ -1159,21 +1165,124 @@ public class MainActivity extends ComponentActivity {
         Set<BluetoothDevice> bondedDevices = bluetoothAdapter.getBondedDevices();
         pairedDevices.addAll(bondedDevices);
 
-        String[] labels = new String[pairedDevices.size()];
-        for (int i = 0; i < pairedDevices.size(); i++) {
-            BluetoothDevice device = pairedDevices.get(i);
-            String name = device.getName() == null ? "Unknown Machine" : device.getName();
-            labels[i] = name + "\n" + device.getAddress();
+        LinearLayout dialogLayout = new LinearLayout(this);
+        dialogLayout.setOrientation(LinearLayout.VERTICAL);
+        dialogLayout.setPadding(dp(16), dp(16), dp(16), dp(16));
+        dialogLayout.setBackgroundColor(color("bg"));
+
+        // Custom Header with Close Button
+        LinearLayout headerRow = new LinearLayout(this);
+        headerRow.setOrientation(LinearLayout.HORIZONTAL);
+        headerRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        headerParams.setMargins(0, 0, 0, dp(16));
+        headerRow.setLayoutParams(headerParams);
+
+        TextView titleTv = new TextView(this);
+        titleTv.setText("Select Host Target");
+        titleTv.setTextColor(Color.WHITE);
+        titleTv.setTextSize(18);
+        titleTv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        headerRow.addView(titleTv, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        ImageButton closeBtn = new ImageButton(this);
+        closeBtn.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+        closeBtn.setBackground(createCardDrawable(color("cardStroke"), 0, 20)); // Circular button background
+        closeBtn.setColorFilter(Color.WHITE);
+        closeBtn.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        closeBtn.setPadding(dp(8), dp(8), dp(8), dp(8));
+        headerRow.addView(closeBtn, new LinearLayout.LayoutParams(dp(36), dp(36)));
+
+        dialogLayout.addView(headerRow);
+
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout listLayout = new LinearLayout(this);
+        listLayout.setOrientation(LinearLayout.VERTICAL);
+
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setView(dialogLayout)
+                .show();
+
+        dialog.getWindow().setBackgroundDrawable(createCardDrawable(color("card"), color("cardStroke"), 12));
+        closeBtn.setOnClickListener(v -> dialog.dismiss());
+
+        if (pairedDevices.isEmpty()) {
+            LinearLayout emptyState = new LinearLayout(this);
+            emptyState.setOrientation(LinearLayout.VERTICAL);
+            emptyState.setGravity(Gravity.CENTER);
+            emptyState.setPadding(0, dp(32), 0, dp(32));
+
+            ImageView emptyIcon = new ImageView(this);
+            emptyIcon.setImageResource(R.drawable.ic_bluetooth);
+            emptyIcon.setColorFilter(color("textSub"));
+            LinearLayout.LayoutParams emptyIconParams = new LinearLayout.LayoutParams(dp(48), dp(48));
+            emptyIconParams.setMargins(0, 0, 0, dp(10));
+            emptyState.addView(emptyIcon, emptyIconParams);
+
+            TextView empty = new TextView(this);
+            empty.setText("No paired devices found.\nPair in Android Settings first.");
+            empty.setTextColor(color("textSub"));
+            empty.setGravity(Gravity.CENTER);
+            emptyState.addView(empty);
+
+            listLayout.addView(emptyState);
+        } else {
+            for (BluetoothDevice device : pairedDevices) {
+                String name = device.getName() == null ? "Unknown Machine" : device.getName();
+                String mac = device.getAddress();
+
+                // Custom Device Card
+                LinearLayout itemCard = new LinearLayout(this);
+                itemCard.setOrientation(LinearLayout.HORIZONTAL);
+                itemCard.setGravity(Gravity.CENTER_VERTICAL);
+                itemCard.setBackground(createCardDrawable(color("card"), color("cardStroke"), 12));
+                itemCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                cardParams.setMargins(0, 0, 0, dp(8));
+                itemCard.setLayoutParams(cardParams);
+
+                // Bluetooth Icon
+                ImageView btIcon = new ImageView(this);
+                btIcon.setImageResource(R.drawable.ic_bluetooth);
+                btIcon.setColorFilter(color("accentIndigo"));
+                LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(26), dp(26));
+                iconParams.setMargins(0, 0, dp(16), 0);
+                itemCard.addView(btIcon, iconParams);
+
+                // Text Container (Name & MAC Address)
+                LinearLayout textContainer = new LinearLayout(this);
+                textContainer.setOrientation(LinearLayout.VERTICAL);
+
+                TextView nameTv = new TextView(this);
+                nameTv.setText(name);
+                nameTv.setTextColor(color("textMain"));
+                nameTv.setTextSize(15);
+                nameTv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                textContainer.addView(nameTv);
+
+                TextView macTv = new TextView(this);
+                macTv.setText(mac);
+                macTv.setTextColor(color("textSub"));
+                macTv.setTextSize(12);
+                macTv.setTypeface(android.graphics.Typeface.MONOSPACE);
+                textContainer.addView(macTv);
+
+                itemCard.addView(textContainer, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+                // Selection Logic
+                itemCard.setOnClickListener(v -> {
+                    selectedDevice = device;
+                    prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
+                    deviceButton.setText(name);
+                    dialog.dismiss();
+                });
+
+                listLayout.addView(itemCard);
+            }
         }
 
-        new AlertDialog.Builder(this)
-                .setTitle("Select Host Target")
-                .setItems(labels, (dialog, which) -> {
-                    selectedDevice = pairedDevices.get(which);
-                    prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
-                    String name = selectedDevice.getName() == null ? "Unknown Machine" : selectedDevice.getName();
-                    deviceButton.setText(name);
-                }).show();
+        scrollView.addView(listLayout);
+        dialogLayout.addView(scrollView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
     }
 
     @SuppressLint("MissingPermission")
@@ -1312,7 +1421,7 @@ public class MainActivity extends ComponentActivity {
         triggerSuccessBeep();
         resetScreenTimeout();
         historyRepository.saveScan(value);
-        runOnUiThread(() -> lastScanText.setText("Last scan: " + value));
+        runOnUiThread(() -> lastScanText.setText(value));
 
         hidExecutor.execute(() -> {
             try {
