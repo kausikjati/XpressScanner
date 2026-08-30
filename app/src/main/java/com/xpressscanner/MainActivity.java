@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothHidDevice;
+import android.bluetooth.BluetoothHidDeviceAppQosSettings;
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings;
 import android.bluetooth.BluetoothProfile;
 import android.app.AlertDialog;
@@ -1132,9 +1133,26 @@ public class MainActivity extends ComponentActivity {
     @SuppressLint("MissingPermission")
     private void registerHidApp() {
         BluetoothHidDeviceAppSdpSettings sdpSettings = new BluetoothHidDeviceAppSdpSettings(
-                "Xpress HID Scanner", "Android Bluetooth Scanner", "Xpress", (byte) 0x00, HidKeyboardMapper.HID_KEYBOARD_DESCRIPTOR
+                "Xpress Scanner",
+                "Android Bluetooth Scanner",
+                "Xpress",
+                BluetoothHidDevice.SUBCLASS1_KEYBOARD,
+                HidKeyboardMapper.HID_KEYBOARD_DESCRIPTOR
         );
-        hidDeviceProxy.registerApp(sdpSettings, null, null, ContextCompat.getMainExecutor(this), new BluetoothHidDevice.Callback() {
+
+        // FIX: Windows strictly requires explicit QoS parameters for HID endpoints.
+        // These are standard USB-HID timing defaults to prevent Windows from dropping the connection.
+        BluetoothHidDeviceAppQosSettings qosSettings = new BluetoothHidDeviceAppQosSettings(
+                BluetoothHidDeviceAppQosSettings.SERVICE_GUARANTEED,
+                800,   // Token rate
+                9,     // Token bucket size
+                0,     // Peak bandwidth
+                11250, // Latency
+                BluetoothHidDeviceAppQosSettings.MAX // Delay variation
+        );
+
+        // Inject qosSettings instead of passing null
+        hidDeviceProxy.registerApp(sdpSettings, qosSettings, qosSettings, ContextCompat.getMainExecutor(this), new BluetoothHidDevice.Callback() {
             @Override
             public void onAppStatusChanged(BluetoothDevice pluggedDevice, boolean registered) {
                 isAppRegistered = registered;
@@ -1150,9 +1168,60 @@ public class MainActivity extends ComponentActivity {
                 syncConnectionState();
                 if (state == BluetoothProfile.STATE_CONNECTED) {
                     triggerConnectBeep();
+                } else if (state == BluetoothProfile.STATE_DISCONNECTED) {
+                    // Instantly reset UI if Windows abruptly drops the connection
+                    runOnUiThread(() -> {
+                        connectButton.setBackground(createCardDrawable(color("btnConnect"), 0, 10));
+                        connectButton.setImageResource(R.drawable.ic_link);
+                        updateStatusUI("Disconnected.", "btnDisconnect");
+                    });
                 }
             }
         });
+    }
+
+    @SuppressLint("MissingPermission")
+    private void toggleConnection() {
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+            showBluetoothOffMessage();
+            return;
+        }
+
+        if (hidDeviceProxy == null) {
+            toast("Framework restarting. Please wait...");
+            setupHidProfile();
+            return;
+        }
+        if (!isAppRegistered) {
+            toast("Registering scanner. Please wait...");
+            registerHidApp();
+            return;
+        }
+
+        if (hidConnectedDevice != null) {
+            updateStatusUI("Disconnecting...", "pillDefault");
+            hidDeviceProxy.disconnect(hidConnectedDevice);
+        } else {
+            if (selectedDevice == null) {
+                toast("Choose a paired configuration first.");
+                return;
+            }
+            prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
+
+            updateStatusUI("Connecting HID Framework...", "pillDefault");
+
+            // FIX: Catch Windows immediate security rejections
+            boolean connectInitiated = hidDeviceProxy.connect(selectedDevice);
+            if (!connectInitiated) {
+                updateStatusUI("Connection rejected.", "btnDisconnect");
+
+                new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                        .setTitle("Windows Blocked Connection")
+                        .setMessage("Windows is blocking the keyboard profile because it cached your phone as a standard device.\n\nTo fix this:\n1. Go to Windows Bluetooth Settings.\n2. Remove/Unpair your phone.\n3. KEEP THIS APP OPEN so the scanner is running.\n4. Pair your phone again from Windows.")
+                        .setPositiveButton("Got it", null)
+                        .show().getWindow().setBackgroundDrawable(createCardDrawable(color("card"), color("cardStroke"), 12));
+            }
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -1285,38 +1354,7 @@ public class MainActivity extends ComponentActivity {
         dialogLayout.addView(scrollView, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
     }
 
-    @SuppressLint("MissingPermission")
-    private void toggleConnection() {
-        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-            showBluetoothOffMessage();
-            return;
-        }
 
-        if (hidDeviceProxy == null) {
-            toast("Framework restarting. Please wait...");
-            setupHidProfile();
-            return;
-        }
-        if (!isAppRegistered) {
-            toast("Registering scanner. Please wait...");
-            registerHidApp();
-            return;
-        }
-
-        if (hidConnectedDevice != null) {
-            updateStatusUI("Disconnecting...", "pillDefault");
-            hidDeviceProxy.disconnect(hidConnectedDevice);
-        } else {
-            if (selectedDevice == null) {
-                toast("Choose a paired configuration first.");
-                return;
-            }
-            prefs.edit().putString("last_device_mac", selectedDevice.getAddress()).apply();
-
-            updateStatusUI("Connecting HID Framework...", "pillDefault");
-            hidDeviceProxy.connect(selectedDevice);
-        }
-    }
 
     private void startCamera() {
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
